@@ -1,0 +1,15 @@
+[project]
+name = "p1-rag"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.7", "python-dotenv>=1.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/p1"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.pytest_cache/
+.DS_Store
+
+# 语料不进 Git（体积大且可再生成）
+data/raw/*
+data/parsed/*
+data/chunks/*
+!data/*/.gitkeep

@@ -35,6 +35,26 @@ HTML_SELECTORS = [".wp_articlecontent", "div.mm", ".TRS_Editor", ".v_news_conten
 csv.field_size_limit(10**7)
 
 
+def join_short_lines(text, thresh=25):
+    """HTML 里 <span> 拆出来的碎行合并回一句，否则「根据 / 《财政部 / 教育部」会各占一行。"""
+    out = []
+    for line in text.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        mergeable = (
+            out
+            and len(line) < thresh
+            and not HEADING.match(line)
+            and not out[-1].endswith(("。", "！", "？", "；", "："))
+        )
+        if mergeable:
+            out[-1] += line
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def clean_text(text):
     lines = []
     for raw in (text or "").replace("\r", "\n").split("\n"):
@@ -47,7 +67,7 @@ def clean_text(text):
         if line != prev:
             out.append(line)
         prev = line
-    return "\n".join(out)
+    return join_short_lines("\n".join(out))
 
 
 def parse_pdf(path):
@@ -174,18 +194,42 @@ def split_chunks(text, pages):
 
 
 def hard_split(body):
-    if len(body) <= MAX_CHARS:
-        return [body]
-    pieces, cur = [], ""
+    """超长块切分：先按句号拆开长段落，再贪心聚合回上限长度。"""
+    pieces = []
     for para in body.split("\n"):
-        if len(cur) + len(para) + 1 > MAX_CHARS and cur:
-            pieces.append(cur.strip())
-            cur = para
+        if len(para) <= MAX_CHARS:
+            pieces.append(para)
+            continue
+        sentences = re.split(r"(?<=[。；！？])", para)
+        buf = ""
+        for sent in sentences:
+            if len(buf) + len(sent) > MAX_CHARS and buf:
+                pieces.append(buf)
+                buf = sent
+            else:
+                buf += sent
+        if buf:
+            pieces.append(buf)
+
+    out, cur = [], ""
+    for piece in pieces:
+        if cur and len(cur) + len(piece) + 1 > MAX_CHARS:
+            out.append(cur)
+            cur = piece
         else:
-            cur = f"{cur}\n{para}" if cur else para
-    if cur.strip():
-        pieces.append(cur.strip())
-    return pieces
+            cur = f"{cur}\n{piece}" if cur else piece
+    if cur:
+        out.append(cur)
+
+    final = []
+    for piece in out:
+        piece = piece.strip()
+        while len(piece) > MAX_CHARS:
+            final.append(piece[:MAX_CHARS])
+            piece = piece[MAX_CHARS:]
+        if piece:
+            final.append(piece)
+    return final
 
 
 def merge_small(chunks):

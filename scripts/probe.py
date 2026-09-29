@@ -153,15 +153,35 @@ def find_candidates(html, base_url, include_pages):
     return found
 
 
+def _sudy_title(node):
+    raw = node.get("sudyfile-attr") or ""
+    m = re.search(r"'title'\s*:\s*'([^']+)'", raw) or re.search(r'"title"\s*:\s*"([^"]+)"', raw)
+    return m.group(1) if m else ""
+
+
 def attachments(html, base_url):
+    """正文里的附件。两类都要认：
+
+    1. 普通 <a href> 直链
+    2. 内嵌 PDF 播放器（pdfsrc= 属性）——信息公开站大量用这种，只看 <a> 会全漏掉
+    """
     soup = BeautifulSoup(html, "html.parser")
-    out = []
-    for a in soup.find_all("a", href=True):
-        url = urljoin(base_url, a["href"].strip())
+    out, seen = [], set()
+
+    def add(url, title):
         path = unquote(urlparse(url).path)
-        if path.lower().endswith(DOC_EXT):
-            out.append({"title": a.get_text(strip=True) or Path(path).stem,
-                        "url": url, "kind": "file", "ext": path.rsplit(".", 1)[-1].lower()})
+        if not path.lower().endswith(DOC_EXT) or url in seen:
+            return
+        seen.add(url)
+        out.append({"title": title or Path(path).stem, "url": url,
+                    "kind": "file", "ext": path.rsplit(".", 1)[-1].lower()})
+
+    for a in soup.find_all("a", href=True):
+        add(urljoin(base_url, a["href"].strip()), a.get_text(strip=True))
+    for node in soup.find_all(attrs={"pdfsrc": True}):
+        add(urljoin(base_url, node["pdfsrc"].strip()), _sudy_title(node))
+    for node in soup.find_all(["iframe", "embed"], src=True):
+        add(urljoin(base_url, node["src"].strip()), _sudy_title(node))
     return out
 
 

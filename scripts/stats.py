@@ -4,14 +4,17 @@ import csv
 from collections import Counter
 from pathlib import Path
 
-rows = list(csv.DictReader(Path("meta/documents.csv").open(encoding="utf-8")))
+all_rows = list(csv.DictReader(Path("meta/documents.csv").open(encoding="utf-8")))
+rows = [r for r in all_rows if r["status"] != "excluded"]
 total = len(rows)
 scanned = sum(1 for r in rows if r["is_scanned"] == "true")
 
 print(f"总条目      {total}")
 if total:
     print(f"扫描件      {scanned}  ({scanned / total * 100:.1f}%)   目标 ≤20%")
-    print(f"现行有效    {sum(1 for r in rows if r['status'] == 'effective')}")
+    print(f"现行有效    {sum(1 for r in rows if r['status'] == 'effective')}"
+          f"   已被替代 {sum(1 for r in rows if r['status'] == 'archived')}"
+          f"   已排除 {len(all_rows) - total}")
 print("\n按部门：")
 for dept, n in Counter(r["dept"] for r in rows).most_common():
     print(f"  {dept:<10}{n:>5}")

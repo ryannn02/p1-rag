@@ -17,7 +17,7 @@
 | `format` | 是 | `pdf` / `doc` / `docx` / `html` |
 | `is_scanned` | 是 | `true` / `false`，决定阶段 2 走不走 OCR，也是「扫描件 ≤20%」的统计依据 |
 | `pages` | 否 | 页数，非 PDF 留空 |
-| `status` | 是 | `effective` 现行有效 / `archived` 已被修订替代（不进检索） |
+| `status` | 是 | `effective` 现行有效 / `archived` 已被修订替代 / `excluded` 误收或重复，不进检索（由 `scripts/triage.py` 标注） |
 | `local_path` | 是 | 相对共享位置的路径，仓库里不存原件 |
 | `fetched_at` | 是 | 采集时间 `YYYY-MM-DD HH:MM:SS`，用于判断增量重采 |
 
@@ -69,6 +69,14 @@
 
 - 栏目里混着「申请表／审批表／下载表格」和真正的制度正文，按关键词过滤时别把表单收进来。
 - 通知公告类栏目单个栏目能到 15+6 条，但绝大部分是通知而非制度，`rule_count` 会很低。
+
+## 常用命令
+
+```bash
+python -m scripts.collect_all --pages 2      # 按 columns.csv 批量采集（部门站先采，信息公开最后）
+python -m scripts.triage --apply             # 把误收的附件、重复条目标为 excluded
+python -m scripts.stats                      # 验收口径统计：总数、扫描件占比、按部门与格式
+```
 
 ## 验收口径
 

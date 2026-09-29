@@ -20,7 +20,11 @@ def main():
     args = ap.parse_args()
 
     rows = list(csv.DictReader(Path("meta/columns.csv").open(encoding="utf-8")))
-    want = [d for d in ORDER if not args.only or d in args.only.split(",")]
+    if args.only:
+        want = args.only.split(",")
+    else:
+        seen = {r["dept"] for r in rows}
+        want = [d for d in ORDER if d in seen] + sorted(seen - set(ORDER))
 
     for dept in want:
         cols = [r for r in rows if r["dept"] == dept]

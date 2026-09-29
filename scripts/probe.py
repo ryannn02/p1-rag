@@ -22,7 +22,8 @@ from bs4 import BeautifulSoup
 
 DOC_EXT = (".pdf", ".doc", ".docx")
 PAGE_RE = re.compile(r"/c\d+a\d+/page\.htm$", re.I)
-RULE_WORDS = ("办法", "规定", "细则", "规程", "制度", "手册", "条例", "实施意见", "汇编")
+RULE_WORDS = ("办法", "规定", "细则", "规程", "制度", "手册", "条例", "章程", "准则", "实施意见", "汇编")
+VERSION_RE = re.compile(r"[（(][^）)]*(?:修订|试行|暂行|版|\d{4})[^）)]*[)）]")
 UA = "Mozilla/5.0 (compatible; SSpU-coursework-bot/0.1)"
 DELAY = 1.5
 META = Path("meta/documents.csv")
@@ -149,6 +150,34 @@ def attachments(html, base_url):
     return out
 
 
+def base_title(title):
+    """去掉「（2024年修订）」「（2019版）」这类版本后缀，用来判定是不是同一制度。"""
+    return re.sub(r"\s+", "", VERSION_RE.sub("", title or ""))
+
+
+def is_rule(title):
+    return any(w in (title or "") for w in RULE_WORDS)
+
+
+def keep_latest(cands):
+    """同一制度多版本只留最新的，其余丢弃不进库。"""
+    def rank(c):
+        y = guess_year(c.get("page_url", ""), c["title"])
+        return int(y) if y.isdigit() else 0
+
+    best = {}
+    for c in cands:
+        key = base_title(c["title"])
+        if key not in best:
+            best[key] = c
+        elif rank(c) > rank(best[key]):
+            print(f"  旧版本丢弃：{best[key]['title'][:36]} -> 保留 {c['title'][:36]}")
+            best[key] = c
+        else:
+            print(f"  旧版本丢弃：{c['title'][:36]}")
+    return list(best.values())
+
+
 def guess_year(*texts):
     """只认 WCM 的 /YYYY/MMDD/ 路径和标题里的年份。
 
@@ -224,6 +253,8 @@ def main():
     ap.add_argument("--discover", action="store_true", help="扫描该页面上的栏目 ID，只写入 meta/columns.csv")
     ap.add_argument("--count", action="store_true", help="配合 --discover：逐个栏目统计制度条数（慢）")
     ap.add_argument("--pages", type=int, default=1, help="顺着 list2.htm 往后翻几页，默认 1")
+    ap.add_argument("--all-items", action="store_true",
+                    help="默认只收标题含制度关键词的条目；加这个开关才收公示、名单、招生信息等")
     args = ap.parse_args()
 
     session = requests.Session()
@@ -254,6 +285,12 @@ def main():
                 seen.add(c["url"])
                 candidates.append(c)
     resp = None
+    if not args.all_items:
+        before = len(candidates)
+        candidates = [c for c in candidates if is_rule(c["title"])]
+        print(f"按标题关键词过滤掉 {before - len(candidates)} 条（公示/名单/招生信息等）")
+    candidates = keep_latest(candidates)
+
     print(f"候选 {len(candidates)} 条：")
     for c in candidates[:40]:
         print(f"  [{c['kind']}] {c['title'][:52]}")

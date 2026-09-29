@@ -60,7 +60,7 @@ def discover_columns(session, url, dept, count):
         parts = urlparse(full)
         if parts.netloc != host:
             continue
-        m = re.fullmatch(r"/(\d+)/list\d*\.htm", parts.path)
+        m = re.fullmatch(r"/([A-Za-z0-9_]+)/list\d*\.htm", parts.path)
         if not m:
             continue
         cid = m.group(1)
@@ -71,7 +71,9 @@ def discover_columns(session, url, dept, count):
             "rule_count": "", "checked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         })
 
-    weak = lambda s: len(s) < 2 or s == ">" or re.fullmatch(r"栏目\d+", s or "")
+    weak = lambda s: bool(
+        re.fullmatch(r"更多[+>»]*|栏目\d+|\d+|>|", (s or "").strip()) or len((s or "").strip()) < 2
+    )
     for cid, row in rows.items():
         need_title = weak(row["title"])
         if not (count or need_title):

@@ -48,6 +48,19 @@
 - `https://xxgk.sspu.edu.cn/3145/list.htm`（信息公开规章制度）栏目里只有一篇正文，
   列表为空，不是批量来源；不要指望它凑够 200 份。
 
+## 栏目清单 columns.csv
+
+`columns.csv` 由 `python -m scripts.probe <站点首页> --dept X --discover --count` 生成，是可重算的
+快照（按 `dept + column_id` 覆盖更新，不留历史）。`rule_count` 只统计列表**第一页**里标题含
+「办法／规定／细则／规程／制度／手册／条例」的条目，是筛选参考值，不是该栏目的制度总数。
+
+分页规律：`/<栏目>/list.htm` → `list2.htm` → `list3.htm`……采的时候记得带 `--pages`。
+
+两个坑：
+
+- 栏目里混着「申请表／审批表／下载表格」和真正的制度正文，按关键词过滤时别把表单收进来。
+- 通知公告类栏目单个栏目能到 15+6 条，但绝大部分是通知而非制度，`rule_count` 会很低。
+
 ## 验收口径
 
 - 「≥200 份」按 `documents.csv` 行数统计，`status=archived` 的也计入总量但单列。

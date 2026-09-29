@@ -26,6 +26,8 @@ RULE_WORDS = ("办法", "规定", "细则", "规程", "制度", "手册", "条�
 UA = "Mozilla/5.0 (compatible; SSpU-coursework-bot/0.1)"
 DELAY = 1.5
 META = Path("meta/documents.csv")
+COLUMNS = Path("meta/columns.csv")
+COLUMN_FIELDS = ["dept", "column_id", "title", "url", "rule_count", "checked_at"]
 RAW = Path("data/raw")
 FIELDS = META.read_text(encoding="utf-8").strip().split(",")
 
@@ -43,6 +45,71 @@ def get(session, url, binary=False):
                 print(f"  请求失败：{url} ({exc})", file=sys.stderr)
                 return None
             time.sleep(2 * (attempt + 1))
+
+
+def discover_columns(session, url, dept, count):
+    """扫一个页面上的所有 /<数字>/list.htm 链接，即栏目入口。"""
+    resp = get(session, url)
+    if resp is None:
+        return []
+    host = urlparse(resp.url).netloc
+    soup = BeautifulSoup(resp.text, "html.parser")
+    rows = {}
+    for a in soup.find_all("a", href=True):
+        full = urljoin(resp.url, a["href"].strip())
+        parts = urlparse(full)
+        if parts.netloc != host:
+            continue
+        m = re.fullmatch(r"/(\d+)/list\d*\.htm", parts.path)
+        if not m:
+            continue
+        cid = m.group(1)
+        rows.setdefault(cid, {
+            "dept": dept, "column_id": cid,
+            "title": a.get_text(strip=True) or f"栏目{cid}",
+            "url": f"{parts.scheme}://{host}/{cid}/list.htm",
+            "rule_count": "", "checked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+    weak = lambda s: len(s) < 2 or s == ">" or re.fullmatch(r"栏目\d+", s or "")
+    for cid, row in rows.items():
+        need_title = weak(row["title"])
+        if not (count or need_title):
+            continue
+        time.sleep(DELAY)
+        page = get(session, row["url"])
+        if page is None:
+            continue
+        if need_title:
+            soup2 = BeautifulSoup(page.text, "html.parser")
+            node = soup2.select_one(".col_title h2") or soup2.select_one("h2")
+            name = node.get_text(strip=True) if node else ""
+            if not name:
+                m = re.search(r"<title>(.*?)(?:[-_|]|</title>)", page.text, re.S | re.I)
+                name = m.group(1).strip() if m else ""
+            if name:
+                row["title"] = name
+        if count:
+            found = find_candidates(page.text, page.url, include_pages=True)
+            row["rule_count"] = sum(1 for c in found if any(w in c["title"] for w in RULE_WORDS))
+            print(f"  栏目 {cid:<5} {row['title'][:18]:<20} 候选 {len(found):>3} 条，含制度关键词 {row['rule_count']:>3} 条")
+    return list(rows.values())
+
+
+def save_columns(rows):
+    """栏目清单是可重算的快照，按 (dept, column_id) 覆盖更新，不追加历史。"""
+    merged = {}
+    if COLUMNS.exists():
+        with COLUMNS.open(newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                merged[(r["dept"], r["column_id"])] = r
+    for r in rows:
+        merged[(r["dept"], r["column_id"])] = r
+    with COLUMNS.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=COLUMN_FIELDS)
+        w.writeheader()
+        for key in sorted(merged):
+            w.writerow(merged[key])
 
 
 def find_candidates(html, base_url, include_pages):
@@ -115,6 +182,15 @@ def sniff_pdf(path):
         return "", ""
 
 
+def page_urls(url, pages):
+    """WCM 分页规律：list.htm -> list2.htm -> list3.htm ..."""
+    m = re.search(r"list\d*\.htm$", url)
+    if not m or pages <= 1:
+        return [url]
+    base = url[: m.start()]
+    return [url] + [f"{base}list{i}.htm" for i in range(2, pages + 1)]
+
+
 def load_known():
     if not META.exists():
         return set()
@@ -143,16 +219,39 @@ def main():
     ap.add_argument("--limit", type=int, default=5)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only-docs", action="store_true", help="只收 PDF/Word，跳过 page.htm 正文")
+    ap.add_argument("--discover", action="store_true", help="扫描该页面上的栏目 ID，只写入 meta/columns.csv")
+    ap.add_argument("--count", action="store_true", help="配合 --discover：逐个栏目统计制度条数（慢）")
+    ap.add_argument("--pages", type=int, default=1, help="顺着 list2.htm 往后翻几页，默认 1")
     args = ap.parse_args()
 
     session = requests.Session()
     session.headers["User-Agent"] = UA
 
-    resp = get(session, args.url)
-    if resp is None:
-        return 1
+    if args.discover:
+        rows = discover_columns(session, args.url, args.dept, args.count)
+        print(f"\n发现 {len(rows)} 个栏目：")
+        for r in rows:
+            print(f"  {r['column_id']:<8} {r['title'][:24]:<26} {r['url']}")
+        save_columns(rows)
+        print(f"已写入 {COLUMNS}")
+        return 0
 
-    candidates = find_candidates(resp.text, resp.url, not args.only_docs)
+    candidates, seen = [], set()
+    for i, page_url in enumerate(page_urls(args.url, args.pages)):
+        if i:
+            time.sleep(DELAY)
+        resp = get(session, page_url)
+        if resp is None:
+            continue
+        found = find_candidates(resp.text, resp.url, not args.only_docs)
+        print(f"  第 {i + 1} 页 {resp.url} -> {len(found)} 条")
+        if not found and i:
+            break
+        for c in found:
+            if c["url"] not in seen:
+                seen.add(c["url"])
+                candidates.append(c)
+    resp = None
     print(f"候选 {len(candidates)} 条：")
     for c in candidates[:40]:
         print(f"  [{c['kind']}] {c['title'][:52]}")

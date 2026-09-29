@@ -24,6 +24,7 @@ DOC_EXT = (".pdf", ".doc", ".docx")
 PAGE_RE = re.compile(r"/c\d+a\d+/page\.(?:htm|psp)$", re.I)
 LIST_RE = re.compile(r"^(?P<prefix>/.+?)list\d*\.(?P<ext>htm|psp)$", re.I)
 RULE_WORDS = ("办法", "规定", "细则", "规程", "制度", "手册", "条例", "章程", "准则", "实施意见", "汇编")
+TRAIL_RE = re.compile(r"\s*[（(][^）)]*[)）]\s*$")
 VERSION_RE = re.compile(r"[（(][^）)]*(?:修订|试行|暂行|版|\d{4})[^）)]*[)）]")
 UA = "Mozilla/5.0 (compatible; SSpU-coursework-bot/0.1)"
 DELAY = 1.5
@@ -31,7 +32,17 @@ META = Path("meta/documents.csv")
 COLUMNS = Path("meta/columns.csv")
 COLUMN_FIELDS = ["dept", "column_id", "title", "url", "rule_count", "checked_at"]
 RAW = Path("data/raw")
-FIELDS = META.read_text(encoding="utf-8").strip().split(",")
+FIELDS = ["doc_id", "dept", "title", "doc_no", "year", "publish_date", "source_url",
+          "page_url", "format", "is_scanned", "pages", "status", "local_path", "fetched_at"]
+
+
+def check_header():
+    """表头与脚本字段不一致时直接报错，别默默写歪列。"""
+    if not META.exists():
+        return
+    header = META.read_text(encoding="utf-8").splitlines()[0].split(",")
+    if header != FIELDS:
+        raise SystemExit(f"meta/documents.csv 表头与脚本字段不一致\n  文件: {header}\n  脚本: {FIELDS}")
 
 
 def get(session, url, binary=False):
@@ -160,7 +171,15 @@ def base_title(title):
 
 
 def is_rule(title):
-    return any(w in (title or "") for w in RULE_WORDS)
+    """文种判定：去掉尾部括号与书名号后，标题必须以文种词收尾。
+
+    不能只做「包含」判断——「关于…网报信息不符合规定的重要提醒」也会命中，
+    结果把通知、提醒当成制度收进来。
+    """
+    t = (title or "").strip().strip("《》").strip()
+    while TRAIL_RE.search(t):
+        t = TRAIL_RE.sub("", t).strip()
+    return t.endswith(RULE_WORDS)
 
 
 def keep_latest(cands):
@@ -269,6 +288,7 @@ def main():
                     help="默认只收标题含制度关键词的条目；加这个开关才收公示、名单、招生信息等")
     args = ap.parse_args()
 
+    check_header()
     session = requests.Session()
     session.headers["User-Agent"] = UA
 
@@ -336,7 +356,7 @@ def main():
                 print(f"  正文内发现 {len(atts)} 个附件，改取附件")
                 att = atts[0]
                 att["page_url"] = c["url"]
-                if len(att["title"]) < 8:
+                if len(att["title"]) < 8 or not is_rule(att["title"]):
                     att["title"] = c["title"]
                 c = att
                 time.sleep(DELAY)

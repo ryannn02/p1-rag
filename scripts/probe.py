@@ -21,7 +21,8 @@ import requests
 from bs4 import BeautifulSoup
 
 DOC_EXT = (".pdf", ".doc", ".docx")
-PAGE_RE = re.compile(r"/c\d+a\d+/page\.htm$", re.I)
+PAGE_RE = re.compile(r"/c\d+a\d+/page\.(?:htm|psp)$", re.I)
+LIST_RE = re.compile(r"^(?P<prefix>/.+?)list\d*\.(?P<ext>htm|psp)$", re.I)
 RULE_WORDS = ("办法", "规定", "细则", "规程", "制度", "手册", "条例", "章程", "准则", "实施意见", "汇编")
 VERSION_RE = re.compile(r"[（(][^）)]*(?:修订|试行|暂行|版|\d{4})[^）)]*[)）]")
 UA = "Mozilla/5.0 (compatible; SSpU-coursework-bot/0.1)"
@@ -61,19 +62,21 @@ def discover_columns(session, url, dept, count):
         parts = urlparse(full)
         if parts.netloc != host:
             continue
-        m = re.fullmatch(r"/([A-Za-z0-9_]+)/list\d*\.htm", parts.path)
-        if not m:
+        m = LIST_RE.match(parts.path)
+        if not m or m.group("prefix") == "/":
             continue
-        cid = m.group(1)
+        prefix, ext = m.group("prefix"), m.group("ext").lower()
+        cid = prefix.strip("/")
         rows.setdefault(cid, {
             "dept": dept, "column_id": cid,
             "title": a.get_text(strip=True) or f"栏目{cid}",
-            "url": f"{parts.scheme}://{host}/{cid}/list.htm",
+            "url": f"{parts.scheme}://{host}{prefix}list.{ext}",
             "rule_count": "", "checked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         })
 
     weak = lambda s: bool(
-        re.fullmatch(r"更多[+>»]*|栏目\d+|\d+|>|", (s or "").strip()) or len((s or "").strip()) < 2
+        re.fullmatch(r"更多[+》>»]*|[Mm]ore[+>»]*|栏目.*|\d+|>|", (s or "").strip())
+        or len((s or "").strip()) < 2
     )
     for cid, row in rows.items():
         need_title = weak(row["title"])
@@ -85,7 +88,8 @@ def discover_columns(session, url, dept, count):
             continue
         if need_title:
             soup2 = BeautifulSoup(page.text, "html.parser")
-            node = soup2.select_one(".col_title h2") or soup2.select_one("h2")
+            node = (soup2.select_one(".col_title h2") or soup2.select_one("h2")
+                    or soup2.select_one(".column-title") or soup2.select_one(".title"))
             name = node.get_text(strip=True) if node else ""
             if not name:
                 m = re.search(r"<title>(.*?)(?:[-_|]|</title>)", page.text, re.S | re.I)
@@ -215,11 +219,19 @@ def sniff_pdf(path):
 
 def page_urls(url, pages):
     """WCM 分页规律：list.htm -> list2.htm -> list3.htm ..."""
-    m = re.search(r"list\d*\.htm$", url)
+    m = re.search(r"list\d*\.(htm|psp)$", url)
     if not m or pages <= 1:
         return [url]
-    base = url[: m.start()]
-    return [url] + [f"{base}list{i}.htm" for i in range(2, pages + 1)]
+    base, ext = url[: m.start()], m.group(1)
+    return [url] + [f"{base}list{i}.{ext}" for i in range(2, pages + 1)]
+
+
+def load_titles():
+    """登记表里已有的制度标题（去版本），用于跨站去重。"""
+    if not META.exists():
+        return set()
+    with META.open(newline="", encoding="utf-8") as f:
+        return {base_title(row["title"]) for row in csv.DictReader(f)}
 
 
 def load_known():
@@ -290,6 +302,14 @@ def main():
         candidates = [c for c in candidates if is_rule(c["title"])]
         print(f"按标题关键词过滤掉 {before - len(candidates)} 条（公示/名单/招生信息等）")
     candidates = keep_latest(candidates)
+
+    known_titles = load_titles()
+    dup = [c for c in candidates if base_title(c["title"]) in known_titles]
+    if dup:
+        print(f"登记表里已有同一制度 {len(dup)} 条，跳过（避免信息公开与部门站重复收录）：")
+        for c in dup[:5]:
+            print(f"    {c['title'][:44]}")
+        candidates = [c for c in candidates if base_title(c["title"]) not in known_titles]
 
     print(f"候选 {len(candidates)} 条：")
     for c in candidates[:40]:

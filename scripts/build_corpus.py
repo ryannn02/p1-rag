@@ -275,6 +275,16 @@ def prune_empty(failures):
         print(f"  {f['dept']:<6}{f['title'][:44]}")
 
 
+def clear_parsed():
+    """重建前清掉旧产物：分诊剔掉的文档不该在 data/parsed 里留残骸。"""
+    n = 0
+    for f in PARSED.glob("*.txt"):
+        f.unlink()
+        n += 1
+    if n:
+        print(f"清掉上一轮 {n} 个全文 txt")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--prune-empty", action="store_true",
@@ -283,6 +293,7 @@ def main():
 
     PARSED.mkdir(parents=True, exist_ok=True)
     FAILURES.parent.mkdir(parents=True, exist_ok=True)
+    clear_parsed()
     rows = [r for r in csv.DictReader(META.open(encoding="utf-8")) if r["status"] != "excluded"]
     print(f"待解析 {len(rows)} 条")
 

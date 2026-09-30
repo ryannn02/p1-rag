@@ -21,6 +21,7 @@ python3 -m venv .venv
 ```bash
 python -m scripts.probe <列表页URL> --dept 教务处   # 采集单个栏目（更多用法见 meta/README.md）
 python -m scripts.collect_all --pages 2             # 按 columns.csv 批量采集
+python -m scripts.collect_all --min-rules 1 --pages 4   # 补采：只跑首页出现过文种词的 107 个栏目
 python -m scripts.reparse_html                      # 把正文为空、内容内嵌在 PDF 播放器里的条目升级
 python -m scripts.triage --apply                    # 标出误收与重复条目
 python -m scripts.build_corpus                      # 解析 + 切分，产出 data/parsed 与 data/chunks.jsonl

@@ -30,6 +30,9 @@ MANUAL_WORDS = RULE_WORDS + ("规划", "方案", "要点", "规范")
 TRAIL_RE = re.compile(r"\s*[（(][^）)]*[)）]\s*$")
 VERSION_RE = re.compile(r"[（(][^）)]*(?:修订|试行|暂行|版|\d{4})[^）)]*[)）]")
 DATE_PREFIX_RE = re.compile(r"^\s*20\d{2}[-./]\d{1,2}[-./]\d{1,2}\s*")
+# 「上海第二工业大学校门出入管理规定」与「校门出入管理规定」是同一份制度，
+# 只是有的站点标题带校名、有的不带
+SCHOOL_PREFIX_RE = re.compile(r"^\s*上海第二工业大学\s*")
 UA = "Mozilla/5.0 (compatible; SSpU-coursework-bot/0.1)"
 DELAY = 1.5
 META = Path("meta/documents.csv")
@@ -192,11 +195,12 @@ def attachments(html, base_url):
 def base_title(title):
     """归一化标题，用来判定是不是同一制度。
 
-    要剥三样：采集器拼在前面的日期（研究生处站点的标题是 2024-03-01xxx）、
-    书名号、「（2024年修订）」「（2019版）」这类版本后缀。剥不干净就会出现
+    要剥四样：书名号、校名前缀、「（2024年修订）」这类版本后缀，以及采集器
+    拼在前面的日期（研究生处站点的标题是 2024-03-01xxx）。剥不干净就会出现
     同一份制度被当成两份、新旧版本一起入库。
     """
-    t = DATE_PREFIX_RE.sub("", (title or "").strip()).strip().strip("《》").strip()
+    t = (title or "").strip().strip("《》").strip()
+    t = SCHOOL_PREFIX_RE.sub("", DATE_PREFIX_RE.sub("", t)).strip()
     return re.sub(r"\s+", "", VERSION_RE.sub("", t))
 
 

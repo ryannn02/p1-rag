@@ -44,9 +44,12 @@
   办法／规定／细则／规程／制度／手册／条例／章程／准则／实施意见／汇编 的条目。
   需要临时放宽时才加 `--all-items`。
 - 若先入库后才发现有更新版本：旧行改成 `status=archived`，再新增新版本行；`archived` 不进检索。
-- **去重是跨部门的**：去重键是归一化标题（剥掉前置日期、书名号、「（2024年修订）」类后缀），
+- **去重是跨部门的**：去重键是归一化标题（剥掉书名号、校名前缀、「（2024年修订）」类后缀、
+  采集器拼在前面的日期），
   不按部门分桶。同一份制度从研究生处站和信息公开站各采一次算重复，保留版本较新的那份，
-  同年份时部门站优先、信息公开站重复的丢掉。但注意 203 → 195 会让「≥200 份」差 5 份。
+  同年份时部门站优先、信息公开站重复的丢掉。
+- **补采走深翻页**：`collect_all --min-rules 1 --pages 4`，764 个栏目里只有 107 个首页出现过
+  文种词，先按这个筛再加深翻页，请求量少一个数量级。
 - **正文为空的网页不收**：官网有些历史页面正文区和附件都是空的（WCM 模板壳还在），
   解析必然失败，用 `python -m scripts.build_corpus --prune-empty` 标 `excluded`。
   图片型 PDF 不在此列——它们现在没文字层，但 OCR 后还有救。
@@ -84,6 +87,7 @@
 python -m scripts.collect_all --pages 2      # 按 columns.csv 批量采集（部门站先采，信息公开最后）
 python -m scripts.triage --apply             # 把误收的附件、重复条目标为 excluded
 python -m scripts.stats                      # 验收口径统计：总数、扫描件占比、按部门与格式
+python -m scripts.collect_all --min-rules 1 --pages 4   # 只补采可能还有制度的栏目，加深翻页
 python -m scripts.import_manual --check      # 人工汇编增量自查（不写盘）
 python -m scripts.import_manual --apply      # 人工汇编增量入库，随后跑 build_corpus
 ```

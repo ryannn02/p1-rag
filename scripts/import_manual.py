@@ -15,10 +15,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, ".")
-from scripts.probe import FIELDS, META, RULE_WORDS, base_title, is_rule  # noqa: E402
+from scripts.probe import FIELDS, MANUAL_WORDS, META, base_title, is_rule  # noqa: E402
 
-# 手工汇编的口径比自动采集略宽：「规划 / 年度工作要点 / 方案 / 规范」也是制度正文
-WIDE_WORDS = RULE_WORDS + ("规划", "方案", "要点", "规范")
 # 信息公开栏目里的公示、名单、招生信息按既定口径不收
 EXCLUDE = re.compile(r"招生|春招|秋招|转段|自主测试|贯通|专升本|三校生|插班生|考试|录取|"
                    r"名单|公示|一览表|分数线|简章|公告|大纲|查询|报告|结果|简介|议程")
@@ -103,7 +101,7 @@ def collect():
             key = base_title(title)
             if not key or key in seen or key in have:
                 continue
-            if EXCLUDE.search(title) or not is_rule(title, WIDE_WORDS):
+            if EXCLUDE.search(title) or not is_rule(title, MANUAL_WORDS):
                 continue
             seen.add(key)
             row, body = make_row(title, body, meta_line, " ".join(ps[:6]))

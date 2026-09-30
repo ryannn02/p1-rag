@@ -24,8 +24,12 @@ DOC_EXT = (".pdf", ".doc", ".docx")
 PAGE_RE = re.compile(r"/c\d+a\d+/page\.(?:htm|psp)$", re.I)
 LIST_RE = re.compile(r"^(?P<prefix>/.+?)list\d*\.(?P<ext>htm|psp)$", re.I)
 RULE_WORDS = ("办法", "规定", "细则", "规程", "制度", "手册", "条例", "章程", "准则", "实施意见", "汇编")
+# 人工整理件的口径：汇编的收录范围本身就把规划、年度工作要点、工作方案、规范算作制度正文。
+# 采集器不能用这套——「XX工作实施方案」的通知会被一起收进来。
+MANUAL_WORDS = RULE_WORDS + ("规划", "方案", "要点", "规范")
 TRAIL_RE = re.compile(r"\s*[（(][^）)]*[)）]\s*$")
 VERSION_RE = re.compile(r"[（(][^）)]*(?:修订|试行|暂行|版|\d{4})[^）)]*[)）]")
+DATE_PREFIX_RE = re.compile(r"^\s*20\d{2}[-./]\d{1,2}[-./]\d{1,2}\s*")
 UA = "Mozilla/5.0 (compatible; SSpU-coursework-bot/0.1)"
 DELAY = 1.5
 META = Path("meta/documents.csv")
@@ -186,8 +190,14 @@ def attachments(html, base_url):
 
 
 def base_title(title):
-    """去掉「（2024年修订）」「（2019版）」这类版本后缀，用来判定是不是同一制度。"""
-    return re.sub(r"\s+", "", VERSION_RE.sub("", title or ""))
+    """归一化标题，用来判定是不是同一制度。
+
+    要剥三样：采集器拼在前面的日期（研究生处站点的标题是 2024-03-01xxx）、
+    书名号、「（2024年修订）」「（2019版）」这类版本后缀。剥不干净就会出现
+    同一份制度被当成两份、新旧版本一起入库。
+    """
+    t = DATE_PREFIX_RE.sub("", (title or "").strip()).strip().strip("《》").strip()
+    return re.sub(r"\s+", "", VERSION_RE.sub("", t))
 
 
 def is_rule(title, words=RULE_WORDS):

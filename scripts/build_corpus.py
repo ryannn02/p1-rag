@@ -293,6 +293,11 @@ def main():
             w.writeheader()
             w.writerows(failures)
 
+    if not chunk_rows and failures:
+        print("\n没有解析出任何内容。若 data/raw 是空的，请先从共享位置同步原始文件再跑；"
+              "若确实有文件，检查 reports/parse_failures.csv 的原因列。", file=sys.stderr)
+        return 2
+
     ok = len(rows) - len(failures)
     lens = [c["chars"] for c in chunk_rows] or [0]
     print(f"解析成功 {ok} 条，失败 {len(failures)} 条（明细见 {FAILURES}）")

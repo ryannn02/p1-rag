@@ -9,7 +9,10 @@ rows = [r for r in all_rows if r["status"] != "excluded"]
 total = len(rows)
 scanned = sum(1 for r in rows if r["is_scanned"] == "true")
 
+missing = [r for r in rows if not Path(r["local_path"]).exists()]
 print(f"总条目      {total}")
+if missing:
+    print(f"⚠ 磁盘上缺 {len(missing)} 个文件：data/raw 尚未同步，登记表有记录但正文不在本地")
 if total:
     print(f"扫描件      {scanned}  ({scanned / total * 100:.1f}%)   目标 ≤20%")
     print(f"现行有效    {sum(1 for r in rows if r['status'] == 'effective')}"

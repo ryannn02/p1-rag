@@ -190,7 +190,7 @@ def base_title(title):
     return re.sub(r"\s+", "", VERSION_RE.sub("", title or ""))
 
 
-def is_rule(title):
+def is_rule(title, words=RULE_WORDS):
     """文种判定：去掉尾部括号与书名号后，标题必须以文种词收尾。
 
     不能只做「包含」判断——「关于…网报信息不符合规定的重要提醒」也会命中，
@@ -199,7 +199,7 @@ def is_rule(title):
     t = (title or "").strip().strip("《》").strip()
     while TRAIL_RE.search(t):
         t = TRAIL_RE.sub("", t).strip()
-    return t.endswith(RULE_WORDS)
+    return t.endswith(words)
 
 
 def keep_latest(cands):

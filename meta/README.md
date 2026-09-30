@@ -44,6 +44,11 @@
   办法／规定／细则／规程／制度／手册／条例／章程／准则／实施意见／汇编 的条目。
   需要临时放宽时才加 `--all-items`。
 - 若先入库后才发现有更新版本：旧行改成 `status=archived`，再新增新版本行；`archived` 不进检索。
+- **正文为空的网页不收**：官网有些历史页面正文区和附件都是空的（WCM 模板壳还在），
+  解析必然失败，用 `python -m scripts.build_corpus --prune-empty` 标 `excluded`。
+  图片型 PDF 不在此列——它们现在没文字层，但 OCR 后还有救。
+- **人工整理件**（`dept=人工整理`）走 `scripts/import_manual.py`，口径额外放宽到
+  规划／年度工作要点／工作方案／规范，并排除招生、转段、名单类条目；只补增量，与已有标题重复的直接丢弃。
 
 ## 已探明的来源站点结构
 
@@ -76,7 +81,15 @@
 python -m scripts.collect_all --pages 2      # 按 columns.csv 批量采集（部门站先采，信息公开最后）
 python -m scripts.triage --apply             # 把误收的附件、重复条目标为 excluded
 python -m scripts.stats                      # 验收口径统计：总数、扫描件占比、按部门与格式
+python -m scripts.import_manual --check      # 人工汇编增量自查（不写盘）
+python -m scripts.import_manual --apply      # 人工汇编增量入库，随后跑 build_corpus
 ```
+
+## 人工整理来源（2026-09-30）
+
+桌面 5 份 DOCX 汇编 + `新建 DOCX 文件.docx` + `~/Downloads/监督工作,后勤保障和特色栏目/`，
+共 12 个源文件、识别 158 条条目。与既有语料比对后**只导入 12 条增量**（其余为重复或被口径排除）：
+学校基本情况 3 条、规划计划 8 条、学生公寓服务管理规范 1 条。
 
 ## 验收口径
 

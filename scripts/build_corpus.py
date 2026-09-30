@@ -5,6 +5,7 @@
 切分策略：优先按「章 / 节 / 条」切，条款不跨块；无条款编号的文档按段落聚合到上限长度。
 """
 
+import argparse
 import csv
 import json
 import re
@@ -13,6 +14,8 @@ import sys
 from pathlib import Path
 
 from bs4 import BeautifulSoup
+
+from scripts.probe import FIELDS
 
 RAW = Path("data/raw")
 PARSED = Path("data/parsed")
@@ -136,6 +139,10 @@ def parse_doc(path):
     return [(text, None)] if text.strip() else []
 
 
+def parse_txt(path):
+    return [(path.read_text(encoding="utf-8", errors="ignore"), None)]
+
+
 def parse_html(path):
     soup = BeautifulSoup(path.read_text(encoding="utf-8", errors="ignore"), "html.parser")
     best = ""
@@ -151,7 +158,7 @@ def parse_html(path):
 
 
 PARSERS = {"pdf": parse_pdf, "docx": parse_docx, "doc": parse_doc, "html": parse_html,
-           "htm": parse_html}
+           "htm": parse_html, "txt": parse_txt}
 
 
 def split_chunks(text, pages):
@@ -244,7 +251,36 @@ def merge_small(chunks):
     return out
 
 
+def prune_empty(failures):
+    """网页正文区为空的条目在官网上就是空壳，永远解析不出内容，直接标 excluded。
+
+    只处理 html：图片型 PDF 现在没文字层，但 OCR 后还有救，不能一并丢掉。
+    """
+    empty = [f for f in failures
+             if f["reason"].startswith("text_too_short") and f["format"] in ("html", "htm")]
+    if not empty:
+        print("没有正文为空的网页条目")
+        return
+    ids = {f["doc_id"] for f in empty}
+    rows = list(csv.DictReader(META.open(encoding="utf-8")))
+    for r in rows:
+        if r["doc_id"] in ids:
+            r["status"] = "excluded"
+    with META.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=FIELDS)
+        w.writeheader()
+        w.writerows(rows)
+    print(f"已标记 {len(ids)} 条正文为空的网页为 excluded：")
+    for f in empty:
+        print(f"  {f['dept']:<6}{f['title'][:44]}")
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--prune-empty", action="store_true",
+                    help="把正文为空的网页条目标成 excluded（写入 meta/documents.csv）")
+    args = ap.parse_args()
+
     PARSED.mkdir(parents=True, exist_ok=True)
     FAILURES.parent.mkdir(parents=True, exist_ok=True)
     rows = [r for r in csv.DictReader(META.open(encoding="utf-8")) if r["status"] != "excluded"]
@@ -297,6 +333,9 @@ def main():
         print("\n没有解析出任何内容。若 data/raw 是空的，请先从共享位置同步原始文件再跑；"
               "若确实有文件，检查 reports/parse_failures.csv 的原因列。", file=sys.stderr)
         return 2
+
+    if args.prune_empty:
+        prune_empty(failures)
 
     ok = len(rows) - len(failures)
     lens = [c["chars"] for c in chunk_rows] or [0]

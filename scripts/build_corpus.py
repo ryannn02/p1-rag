@@ -294,7 +294,8 @@ def main():
     PARSED.mkdir(parents=True, exist_ok=True)
     FAILURES.parent.mkdir(parents=True, exist_ok=True)
     clear_parsed()
-    rows = [r for r in csv.DictReader(META.open(encoding="utf-8")) if r["status"] != "excluded"]
+    # archived 是已被新版替代的历史版本，保留在册供追溯，但不进检索
+    rows = [r for r in csv.DictReader(META.open(encoding="utf-8")) if r["status"] == "effective"]
     print(f"待解析 {len(rows)} 条")
 
     failures, chunk_rows, n_chunks = [], [], 0

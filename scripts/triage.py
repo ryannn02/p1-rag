@@ -34,7 +34,7 @@ def dedupe(rows):
     """按 base_title 跨部门归并，返回被排除的行。"""
     groups = {}
     for r in rows:
-        if r["status"] == "excluded":
+        if r["status"] != "effective":
             continue
         groups.setdefault(base_title(r["title"]), []).append(r)
     dup = []
@@ -56,7 +56,7 @@ def main():
     rows = list(csv.DictReader(META.open(encoding="utf-8")))
     not_rule = []
     for r in rows:
-        if r["status"] != "excluded" and not is_rule(r["title"], MANUAL_WORDS):
+        if r["status"] == "effective" and not is_rule(r["title"], MANUAL_WORDS):
             not_rule.append(r)
             r["status"] = "excluded"
     dup = dedupe(rows)

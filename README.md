@@ -4,10 +4,23 @@
 
 ## 环境准备
 
+macOS / Linux：
+
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e . pytest
 ```
+
+Windows（PowerShell，用 `;` 而非 `&&`，或分两行执行）：
+
+```powershell
+py -3 -m venv .venv
+.venv\Scripts\pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e . pytest
+```
+
+之后所有命令里的 `.venv/bin/python` 在 Windows 上换成 `.venv\Scripts\python.exe`，
+`source .venv/bin/activate` 换成 `.venv\Scripts\activate`。其余一样——检索、生成、网页服务
+都是纯 Python，没有别的东西依赖特定系统。
 
 ## 运行
 
@@ -45,7 +58,9 @@ python -m scripts.build_corpus                      # 解析 + 切分，产出 d
 python -m scripts.stats                             # 语料验收口径统计
 ```
 
-`.doc` 的解析依赖 macOS 自带的 `textutil`；Linux 上需要改用 LibreOffice。
+`.doc` 是二进制格式，没有纯 Python 解析库，借系统工具转换：macOS 用自带的 `textutil`，
+Windows / Linux 装 [LibreOffice](https://www.libreoffice.org/) 后自动走 `soffice`。两者都没有时
+会跳过 `.doc` 文件（本语料里是 11 份制度 / 48 个 chunk）并在终端提示，不影响其余流程。
 
 ## 检索基线（阶段 3）
 

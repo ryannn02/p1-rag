@@ -151,7 +151,7 @@
 | NFR-05 | 结构化 | 凡是需要被程序消费的模型输出，必须用 JSON Schema 或 Function Calling 约束 |
 | NFR-06 | 成本 | 单次问答成本可核算；嵌入与重排批量化、高频问题缓存 |
 | NFR-07 | 合规 | 只采集公开制度文档；不采集需登录内容；真实咨询记录脱敏后才能使用 |
-| NFR-08 | 可移植 | 除 macOS 自带的 `textutil` 外，不依赖特定操作系统工具；Linux 上以 LibreOffice 替代 |
+| NFR-08 | 可移植 | 仅 `.doc` 解析需要系统工具：macOS 用自带 `textutil`，Windows / Linux 用 LibreOffice 的 `soffice`，两者皆无则跳过该格式；其余全部跨平台 |
 | NFR-09 | 安全 | API Key 等凭据不入库，统一走环境变量 |
 
 ---

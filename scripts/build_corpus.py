@@ -9,8 +9,10 @@ import argparse
 import csv
 import json
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -128,13 +130,34 @@ def parse_docx_xml(path):
     return htmllib.unescape(re.sub(r"<[^>]+>", "", xml))
 
 
-def parse_doc(path):
-    try:
+def _doc_text(path):
+    """`.doc` 是二进制格式，没有纯 Python 解析库，借系统工具转文本。
+
+    macOS 自带 `textutil`（能直接写 stdout）；Windows / Linux 装 LibreOffice 后有 `soffice`，
+    但它只能写文件——转进临时目录再读回，并显式指定 UTF-8，免得落到系统默认编码
+    （Windows 上是 GBK，中文会全烂）。
+    """
+    if shutil.which("textutil"):
         r = subprocess.run(["textutil", "-convert", "txt", "-stdout", str(path)],
                            capture_output=True, timeout=60)
-        text = r.stdout.decode("utf-8", errors="ignore")
+        return r.stdout.decode("utf-8", errors="ignore")
+    if shutil.which("soffice"):
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run(["soffice", "--headless", "--convert-to",
+                            "txt:Text (encoded):UTF8", "--outdir", tmp, str(path)],
+                           capture_output=True, timeout=180)
+            out = Path(tmp) / f"{path.stem}.txt"
+            return out.read_text(encoding="utf-8", errors="ignore") if out.exists() else ""
+    print("    未找到 .doc 转换工具，跳过该文件：macOS 用自带的 textutil；"
+          "Windows / Linux 装 LibreOffice 即可", file=sys.stderr)
+    return ""
+
+
+def parse_doc(path):
+    try:
+        text = _doc_text(path)
     except Exception as exc:
-        print(f"    .doc 转换失败（需要 textutil 或 LibreOffice）：{exc}", file=sys.stderr)
+        print(f"    .doc 转换失败：{exc}", file=sys.stderr)
         return []
     return [(text, None)] if text.strip() else []
 

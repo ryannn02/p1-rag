@@ -23,6 +23,18 @@ pytest -q                           # 29 项单元测试，不联网不烧 token
 
 ## 语料流水线
 
+**语料不进 Git**（原始文件 53 MB）。从 [Releases](https://github.com/ryannn02/p1-rag/releases) 下载
+`p1-rag-corpus-*.zip`，在**仓库根目录**解压即可直接落到 `data/raw/`（包内路径与 `meta/documents.csv`
+的 `local_path` 一致），然后重建：
+
+```bash
+unzip ~/Downloads/p1-rag-corpus-v0.1.0-beta.zip   # → data/raw/<部门>/<年份>/<文件名>
+python -m scripts.build_corpus    # 解析 + 切分
+python -m scripts.build_index     # 建向量索引
+```
+
+以下是采集与维护流水线，只想跑问答的话不用看：
+
 ```bash
 python -m scripts.probe <列表页URL> --dept 教务处   # 采集单个栏目（更多用法见 meta/README.md）
 python -m scripts.collect_all --pages 2             # 按 columns.csv 批量采集

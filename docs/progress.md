@@ -11,22 +11,53 @@
 
 ## 零、怎么跑起来
 
+### 上机第一步（只做一次）
+
 ```bash
-cd ~/proj/p1-rag
-source .venv/bin/activate
+cd ~/proj/p1-rag          # 必须在仓库根目录，脚本读 data/ prompts/ 用的是相对路径
+source .venv/bin/activate # 依赖都装在 .venv 里，别用系统 python3
 ```
+
+### 起网页服务
+
+任一种写法效果相同，区别只在怎么指 venv 和端口：
+
+| 写法 | 说明 |
+| --- | --- |
+| `python -m scripts.serve` | 模块方式，README 里的写法 |
+| `python scripts/serve.py` | 直接跑文件 |
+| `.venv/bin/python scripts/serve.py` | 不用先 `source activate`，路径写全 |
+| `python scripts/serve.py 9000` | 换端口（默认 8000） |
+
+起来后会打印：
+
+```
+加载向量索引与模型…
+就绪：http://127.0.0.1:8000  （Ctrl+C 停止）
+```
+
+浏览器打开 `http://127.0.0.1:8000` 即可问答。**服务会一直占着这个终端**，`Ctrl+C` 或关窗口才停。
+
+| 起不来时 | 处理 |
+| --- | --- |
+| `Address already in use` | 端口被占：`pkill -f scripts.serve` 后重起，或换端口 |
+| `No module named 'scripts'` | 当前目录不对，先 `cd ~/proj/p1-rag` |
+| 提示未设置 `LLM_API_KEY` | `.env` 不在仓库根目录，或没写 key |
+| `ERR_CONNECTION_REFUSED`（浏览器） | 服务没在跑，或端口对不上（默认 8000） |
+| 进程还在但页面打不开 | 换端口重起，或看终端里的报错 |
+
+注：阶段 0 的占位入口 `python -m p1.service` 已删除，早期笔记里看到它请改上面的写法。
+
+### 其他入口
 
 | 想做的事 | 命令 |
 | --- | --- |
-| 网页演示（推荐） | `python -m scripts.serve` → 打开 http://127.0.0.1:8000 |
 | 命令行问一句 | `python -m scripts.ask "图书馆一次能借几本书"` |
-| 跑 6 条端到端用例 | `python -m scripts.eval_answer` |
+| 跑 6 条端到端用例打真模型 | `python -m scripts.eval_answer` |
 | 跑检索基线（不调模型） | `python -m scripts.retrieval_smoke` |
-| 跑全部单元测试（不联网） | `python -m pytest -q` |
+| 跑全部单元测试（不联网） | `pytest -q` |
 
-**两个前提**：`.env` 里要有 `LLM_API_KEY`（DeepSeek，已在本地且不进 Git）；命令必须在仓库根目录跑
-（脚本用的是相对路径）。**第一次提问要等约 15 秒**——本地向量模型首次检索才加载，之后每个问题
-不到 1 秒。网页服务会一直占用这个终端，`Ctrl+C` 停止。
+**第一次提问要等约 15 秒**——本地向量模型在首次检索时才加载，之后每个问题不到 1 秒。
 
 ---
 
@@ -382,3 +413,4 @@ python -m scripts.eval_answer      # 6 条端到端问答打真模型，核对�
 | `6491a13` | 修引用去重别名错位与标号误删；提示词 v2 补主体核对规则；新增 `eval_answer.py`，6/6 通过 |
 | `beac7e4` | 判重键补剥列表序号与标点，同一条款不再被引三次；全语料误并核对 |
 | `a0ec33e` | 最小演示界面（标准库 http.server），已实测页面问答全流程 |
+| `8f1e3e0` | 三份文档进 `docs/`；README 更新到现状；删除无人引用的占位 `src/p1/service.py` |

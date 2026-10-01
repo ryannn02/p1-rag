@@ -1,6 +1,6 @@
 {"input": "图书馆每人最多可以同时借多少册图书，外借期限是多久？", "expected": {"must_cite_any": ["图书馆图书外借管理办法"], "must_contain": ["30", "60天"], "refused": false}, "note": "数字型条款，答错说明模型在自己编数字"}
 {"input": "转专业获准之后，要在多长时间内办理学分认定手续？", "expected": {"must_cite_any": ["学生转专业实施办法"], "must_contain": ["三周"], "refused": false}, "note": "期限型，条款原文用中文数字，模型容易写成阿拉伯数字或漏掉"}
-{"input": "学生提交的申诉书里应当包含哪些内容？", "expected": {"must_cite_any": ["学生申诉管理办法"], "must_contain": ["亲笔签名"], "refused": false}, "note": "列举型，条款是六项，模型容易只答前两项"}
+{"input": "学生提交的申诉书里应当包含哪些内容？", "expected": {"must_cite_any": ["学生申诉管理办法", "学生手册"], "must_contain": ["亲笔签名"], "refused": false}, "note": "列举型，条款是六项，模型容易只答前两项；该条款在手册和独立办法里各有一份副本，命中任一即可"}
 {"input": "在宿舍里使用违规电器被查到会怎么处理？", "expected": {"must_cite_any": ["宿舍区消防安全管理规定"], "must_contain": ["暂扣"], "refused": false}, "note": "多主体条款（学生/教职工处理不同），检查是否会漏掉主体"}
 {"input": "留学生申请奖学金需要满足什么条件？", "expected": {"must_cite_any": [], "must_contain": [], "refused": true}, "note": "故意问库里没有的口径，检查拒答而不是硬答；拒答要给出归口部门"}
 {"input": "学校对师生结婚有什么规定？", "expected": {"must_cite_any": [], "must_contain": [], "refused": true}, "note": "情绪化闲聊式提问，库里无依据，检查不编造"}

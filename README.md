@@ -12,9 +12,14 @@ python3 -m venv .venv
 ## 运行
 
 ```bash
-.venv/bin/python -m p1.service      # 打印一条占位 JSON
-.venv/bin/pytest -q                 # 提示词结构与用例校验
+python -m scripts.serve             # 网页演示 → http://127.0.0.1:8000
+python -m scripts.ask "图书馆一次能借几本书"   # 命令行问一句
+python -m scripts.eval_answer       # 6 条端到端用例打真模型，核对引用与拒答
+pytest -q                           # 29 项单元测试，不联网不烧 token
 ```
+
+需要 `.env` 里的 `LLM_API_KEY`（见下），且命令都在仓库根目录跑。首次提问要等约 15 秒
+加载本地向量模型，之后每个问题不到 1 秒。
 
 ## 语料流水线
 
@@ -44,11 +49,35 @@ python -m scripts.retrieval_smoke --per-doc 0       # 关掉「同文件限席�
 国内直连 huggingface.co 会被拒，`.env` 里设 `HF_ENDPOINT=https://hf-mirror.com`
 拉模型（必须在 `huggingface_hub` 导入前生效，`src/p1/retriever.py` 已在模块顶部 load）。
 
-召回口径见 `src/p1/retriever.py`：暴力余弦，4403 条语料单查询约 15 ms，
+召回口径见 `src/p1/retriever.py`：暴力余弦，4583 条语料单查询约 15 ms，
 语料上到十万级再换 FAISS。
+
+## 生成与引用（阶段 4）
+
+```bash
+python -m scripts.ask "在宿舍里使用违规电器被查到会怎么处理"
+```
+
+**引用的元数据全部由代码回填，不由模型生成**：模型只能从召回结果里挑编号（`used: [1,3]`），
+`file / page / section / score` 一律取自检索结果，挑不出有效编号就拒答。提示词在
+`prompts/answer/v2.md`（v1 保留），回归用例在 `prompts/answer/cases.jsonl`。
+
+需要 `.env`：
+
+```
+LLM_API_KEY=sk-...                                # 必填，.env 已 gitignore
+LLM_BASE_URL=https://api.deepseek.com/v1          # 默认 DeepSeek
+LLM_MODEL=deepseek-chat
+HF_ENDPOINT=https://hf-mirror.com                 # 拉向量模型用镜像
+```
+
+`src/p1/llm.py` 走 OpenAI 兼容的 `/chat/completions`，换通义/智谱只改 `LLM_BASE_URL`。
 
 ## 约定
 
+- 需求分析（33 条 FR + 9 条 NFR）：`docs/requirements.md`
+- 实施方案（10 个阶段的排期与工具）：`docs/plan.md`
+- 阶段进度报告（做了什么、数据在哪、踩过哪些坑）：`docs/progress.md`
 - 协作与分支流程：`docs/contributing.md`
 - 提示词版本与用例格式：`prompts/README.md`
 - 接口契约唯一真源：`src/p1/contracts.py`

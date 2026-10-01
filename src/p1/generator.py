@@ -68,8 +68,16 @@ def to_citation(hit):
 
 
 def dedupe_key(text):
+    """同一条款在汇编与独立制度里的副本，正文只差条号、列表序号、标点和换行。
+
+    这几样全剥掉再比：条号（第三条 / 第十三条）、列表序号（1．/ 2. / （一））、
+    空白与标点。数字内容保留——「外借 30 册」和「外借 10 册」是两条不同条款，
+    抹掉数字会把它们并成一条，引用就指错数了。
+    """
     text = re.sub(r"第\s*[一二三四五六七八九十百零〇\d]+\s*[条章节]", "", text or "")
-    return re.sub(r"\s+", "", text)[:80]
+    text = re.sub(r"\d+\s*[．.、)）]", "", text)
+    text = re.sub(r"[（(][一二三四五六七八九十\d]+[）)]", "", text)
+    return re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]", "", text)
 
 
 def dedupe_citations(picked):

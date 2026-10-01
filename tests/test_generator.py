@@ -115,3 +115,41 @@ def test_used_index_is_deduped_and_capped():
         "问", HITS, llm=stub({"answer": "答 [1]", "used": [1, 1, 2], "refused": False})
     )
     assert [c.file for c in res.citations] == [HITS[0]["title"], HITS[1]["title"]]
+
+
+def test_same_clause_from_three_sources_is_merged():
+    """真实语料里的三份副本：汇编、学生手册、独立办法。
+
+    正文只差条号、列表序号（`1．` / `1.` / 无）、标点和换行——只剥条号与空白
+    是抓不到的（真实 badcase，转专业条件被引用三次）。
+    """
+    hits = [
+        {"title": "教学管理文件汇编", "page": 42, "section": "第五章附则", "score": 0.772,
+         "text": "第一条：申请转专业的基本条件\n1．学生确有专长，对转入专业感兴趣，转专业后更能发挥专长；\n"
+                 "2．入学后因患某种疾病或生理缺陷（需有二级甲等及以上医院证明），或\n确有特殊困难（需学校认定），"
+                 "不能在原专业学习，但仍能在其他专业学习者。"},
+        {"title": "上海第二工业大学学生手册（2023版）", "page": 45, "section": "第四章 附 则", "score": 0.745,
+         "text": "第一条：申请转专业的基本条件\n1.学生确有专长，对转入专业感兴趣，转专业后更能发挥专长；\n"
+                 "入学后因患某种疾病或生理缺陷（需有二级甲等及以上医院证\n明），或确有特殊困难（需学校认定），"
+                 "不能在原专业学习，但仍能在其他专业学习者。"},
+        {"title": "上海第二工业大学学生转专业实施办法（修订）", "page": "", "section": "", "score": 0.697,
+         "text": "第一条：申请转专业的基本条件\n学生确有专长，对转入专业感兴趣，转专业后更能发挥专长；\n"
+                 "入学后因患某种疾病或生理缺陷（需有二级甲等及以上医院证明），或确有特殊困难（需学校认定），"
+                 "不能在原专业学习，但仍能在其他专业学习者。"},
+    ]
+    res = answer_from_hits(
+        "转专业需要什么条件", hits,
+        llm=stub({"answer": "需要专长或身体原因 [1][2][3]", "used": [1, 2, 3], "refused": False}),
+    )
+    assert [c.file for c in res.citations] == ["教学管理文件汇编"]
+    assert res.citations[0].page == 42
+    assert res.answer == "需要专长或身体原因 [1]"
+
+
+def test_dedupe_key_keeps_numbers_apart():
+    """数字是条款内容（30 册 vs 10 册），不能当标点一样抹掉。"""
+    from p1.generator import dedupe_key
+
+    a = "第五条 教职工每人均可同时外借30册图书，外借期限为60天。"
+    b = "第五条 教职工每人均可同时外借10册图书，外借期限为30天。"
+    assert dedupe_key(a) != dedupe_key(b)

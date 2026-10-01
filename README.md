@@ -18,9 +18,10 @@ py -3 -m venv .venv
 .venv\Scripts\pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e . pytest
 ```
 
-之后所有命令里的 `.venv/bin/python` 在 Windows 上换成 `.venv\Scripts\python.exe`，
-`source .venv/bin/activate` 换成 `.venv\Scripts\activate`。其余一样——检索、生成、网页服务
-都是纯 Python，没有别的东西依赖特定系统。
+之后所有命令里的 `.venv/bin/python` 在 Windows 上换成 `.venv\Scripts\python.exe`。
+其余一样——检索、生成、网页服务都是纯 Python，没有别的东西依赖特定系统。
+
+**Windows 完整步骤（含 `.env` 怎么建、语料怎么解压、常见报错对照）见 [`docs/windows.md`](docs/windows.md)。**
 
 ## 运行
 
@@ -102,6 +103,7 @@ HF_ENDPOINT=https://hf-mirror.com                 # 拉向量模型用镜像
 
 ## 约定
 
+- **Windows 用户先看这份**：`docs/windows.md`
 - 需求分析（33 条 FR + 9 条 NFR）：`docs/requirements.md`
 - 实施方案（10 个阶段的排期与工具）：`docs/plan.md`
 - 阶段进度报告（做了什么、数据在哪、踩过哪些坑）：`docs/progress.md`

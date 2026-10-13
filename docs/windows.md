@@ -1,7 +1,8 @@
 # Windows 使用指南
 
-对应 release **v0.1.0-beta.2 及以后**。更早的 `v0.1.0-beta` 少了 `.doc` 的 `soffice` 回退，
-会少 11 份制度（见文末）。
+对应 release **v0.1.0-beta.3 及以后**。更早的版本有两个坑：`v0.1.0-beta` 少了 `.doc` 的
+`soffice` 回退，会少 11 份制度；`v0.1.0-beta.2` 及更早的解析器会把正文里的数字当页码删掉
+（见 `docs/issues.md` I-13）。两者都在代码里，只换语料包没用。
 
 本文假定你从没在这台机器上跑过 Python 项目。全程复制粘贴即可，命令用 **PowerShell**
 （开始菜单搜「PowerShell」）。

@@ -94,16 +94,24 @@ source .venv/bin/activate # 依赖都装在 .venv 里，别用系统 python3
 | 指标 | 结果 |
 | --- | --- |
 | 解析 | 263 条中 **261 条成功，2 条失败**（明细见 `reports/parse_failures.csv`） |
-| 切分 | **4583 个 chunk**，平均 275 字，最长 800 字，无 50 字以下碎片 |
-| 可追溯性 | 3518 块带章节路径，2592 块带页码——阶段 4「引用可点开跳转原文」依赖这两个字段 |
-| 产出规模 | 全文 3.6 MB，chunk 5.2 MB |
+| 切分 | **4190 个 chunk**，平均 303 字，最长 800 字，无 50 字以下碎片 |
+| 可追溯性 | 3192 块带章节路径，2602 块带页码——阶段 4「引用可点开跳转原文」依赖这两个字段 |
+| 产出规模 | 全文 3.6 MB，chunk 5.1 MB |
+
+> **2026-10-13 重建过一次**（问题 I-13）。上一版是 4583 chunk / 平均 275 字；
+> `parse_html` 用 `get_text("\n")` 在每个 `<span>` 之间插换行，Word 导出的 HTML
+> 把数字单独包在 span 里，数字就独占一行，随后被 `clean_text` 的页码正则删掉——
+> 助学金 2800/3800、学业奖学金 8000 这些金额在语料里是缺的。
+> 改成只在块级标签处断行 + 页码正则要求带破折号之后重建，数字回来了，
+> chunk 数变成 4190（少掉的 393 块是原先被多余换行切碎的）。
+> **Recall@5 仍是 19/20，端到端 6/6。**
 
 ### 阶段 3｜检索基线
 
 | 指标 | 结果 |
 | --- | --- |
 | 向量模型 | `BAAI/bge-small-zh-v1.5`（512 维，本地跑，无需 API） |
-| 索引 | **4583 条 × 512 维**，`data/index/embeddings.npy` 9.4 MB，M 系列芯片约 1 分钟建完 |
+| 索引 | **4190 条 × 512 维**，`data/index/embeddings.npy` 8.2 MB，M 系列芯片约 1 分钟建完 |
 | 冒烟集 | `eval/smoke_questions.jsonl` 20 条，每题标注期望制度 + 期望事实，逐条人工核对过 `doc_id` |
 | **Recall@5** | **19/20 = 95%**（同文件限席 2）；不限席为 85%，限席 1 为 100% |
 | Top-1 命中 | 13/20 = 65% |
@@ -113,7 +121,7 @@ source .venv/bin/activate # 依赖都装在 .venv 里，别用系统 python3
 **Recall@5 口径**：top-5 里任一 chunk 的 `doc_id` 命中标注的制度文件即算命中。标注到制度级
 不标到段落——同一事实在长篇制度里可能落在相邻条款。明细进 `reports/retrieval_smoke.csv`。
 
-**没上 FAISS / Chroma**：4583 条语料的暴力余弦单查询 15 ms，索引 9.4 MB，公式只有一行。
+**没上 FAISS / Chroma**：4190 条语料的暴力余弦单查询 15 ms，索引 8.2 MB，公式只有一行。
 多引一个向量库只是多一份要同步的状态、多一套要解释的构建流程。语料上到十万级再换
 （`src/p1/retriever.py` 里留了 `ponytail:` 标注写明升级路径）。
 
@@ -202,7 +210,7 @@ Top-1 从 55% 升到 65%。默认取 2 而不是 1：20 条问题定不下这个
 | transformers / tokenizers | 5.17.0 / 0.23.2 | 模型实现与分词 |
 | huggingface_hub | 1.33.0 | 拉模型权重 |
 
-未引入的东西及原因：不用 `uv`/`conda`（venv + pip 够用）、不用 `playwright`（站点均为服务端渲染，实测无需 JS）、不用 `pandas`（登记表用标准库 `csv` 处理足够）、不用 MySQL / Navicat（几百行数据用 CSV 进 Git 更可审查，且 MySQL 无向量检索能力）、不用 **FAISS / Chroma**（4583 条语料的暴力余弦 15 ms，向量库在这个量级只增加状态）。
+未引入的东西及原因：不用 `uv`/`conda`（venv + pip 够用）、不用 `playwright`（站点均为服务端渲染，实测无需 JS）、不用 `pandas`（登记表用标准库 `csv` 处理足够）、不用 MySQL / Navicat（几百行数据用 CSV 进 Git 更可审查，且 MySQL 无向量检索能力）、不用 **FAISS / Chroma**（4190 条语料的暴力余弦 15 ms，向量库在这个量级只增加状态）。
 
 两个环境坑：Python 3.14.7 上 `torch 2.14` 与 `sentence-transformers 6.1` 都有 arm64 轮子，装得上；但**直连 huggingface.co 会被拒**，`.env` 里必须设 `HF_ENDPOINT=https://hf-mirror.com`，且要在 `huggingface_hub` 导入前生效（`src/p1/retriever.py` 已在模块顶部 `load_dotenv()`）。
 
@@ -260,9 +268,9 @@ Top-1 从 55% 升到 65%。默认取 2 而不是 1：20 条问题定不下这个
             ↓ build_corpus.py  解析 + 清洗
           data/parsed/（261 份全文 txt，3.6 MB）
             ↓ build_corpus.py  按章/条切分
-          data/chunks.jsonl（4583 个 chunk，5.2 MB）
+          data/chunks.jsonl（4190 个 chunk，5.1 MB）
             ↓ build_index.py  bge-small-zh-v1.5 编码
-          data/index/embeddings.npy（4583 × 512，9.4 MB，不进 Git）
+          data/index/embeddings.npy（4190 × 512，8.2 MB，不进 Git）
             ↓ retrieval_smoke.py  余弦召回 + Recall@5
           reports/retrieval_smoke.csv（20 条逐题命中明细）
             ↓ generator.py  召回结果编成带编号的条款清单 + 模型挑编号
@@ -417,6 +425,7 @@ python -m scripts.eval_answer      # 6 条端到端问答打真模型，核对�
 | `724326f` | 新旧版本校对（10 份标 archived）、`archived` 不进检索的管道修复（263 份 / 4583 chunk） |
 | `b8d274e` | 阶段 4 生成与强制引用（提示词 v1 + 契约回填 + 端到端 CLI） |
 | `6491a13` | 修引用去重别名错位与标号误删；提示词 v2 补主体核对规则；新增 `eval_answer.py`，6/6 通过 |
+| `9c4468f` | 修 HTML 解析丢数字（I-13）：块级标签断行 + 页码正则收紧，重建语料与索引（4190 chunk） |
 | `beac7e4` | 判重键补剥列表序号与标点，同一条款不再被引三次；全语料误并核对 |
 | `a0ec33e` | 最小演示界面（标准库 http.server），已实测页面问答全流程 |
 | `8f1e3e0` | 三份文档进 `docs/`；README 更新到现状；删除无人引用的占位 `src/p1/service.py` |

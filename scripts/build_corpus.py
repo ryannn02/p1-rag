@@ -6,6 +6,7 @@
 """
 
 import argparse
+import copy
 import csv
 import json
 import re
@@ -33,7 +34,11 @@ MIN_DOC_CHARS = 120
 HEADING = re.compile(r"^\s*第\s*[一二三四五六七八九十百零〇\d]+\s*[条章节编节]|^\s*第\s*[一二三四五六七八九十]+\s*部分")
 NOISE = re.compile(r"网站总访问人次|版权所有|沪ICP备|浏览次数|加入收藏|设为首页|友情链接|"
                    r"^\s*发布时间[:：]|^\s*来源[:：]|^\s*打印本页|^\s*关闭窗口|^\s*分享到")
-PAGENO = re.compile(r"^\s*[-—\s]*\d{1,3}\s*[-—\s]*$")
+# 只认带破折号/短横的页码。原先 `^\s*[-—\s]*\d{1,3}\s*[-—\s]*$` 会把任何
+# 独占一行的 1–3 位数字删掉——Word 导出的 HTML 把数字单独包在 <span> 里，
+# get_text 让它独占一行，「每年内完成 10 分」就变成了「每年内完成　分」。
+# ponytail: 没装饰的页码会作为噪声留在 chunk 里；等它真的碍事再按页边界剔。
+PAGENO = re.compile(r"^\s*[-—]\s*\d{1,3}\s*[-—]?\s*$|^\s*\d{1,3}\s*[-—]\s*$")
 HTML_SELECTORS = [".wp_articlecontent", "div.mm", ".TRS_Editor", ".v_news_content",
                   "#content", ".article-content", ".Article_Content", ".entry"]
 
@@ -166,17 +171,34 @@ def parse_txt(path):
     return [(path.read_text(encoding="utf-8", errors="ignore"), None)]
 
 
+BLOCK_TAGS = ["p", "div", "br", "tr", "li", "h1", "h2", "h3", "h4", "h5", "table"]
+
+
+def html_text(node):
+    """只在块级标签处断行，不在每个文本节点之间断。
+
+    `get_text("\\n")` 会在每个 <span> 之间插换行。Word 导出的 HTML 习惯把数字
+    单独包一个 span（`…完成</span><span>10</span><span>分…`），于是「10」独占
+    一行，接着被 clean_text 当页码删掉——正文里的数字就这么没了。
+    """
+    node = copy.copy(node)
+    for tag in node.find_all(BLOCK_TAGS):
+        tag.insert_after("\n")
+    # 不能用 strip=True：它会把刚插进去的换行也当空白剥掉，整篇会粘成一行
+    return node.get_text("", strip=False)
+
+
 def parse_html(path):
     soup = BeautifulSoup(path.read_text(encoding="utf-8", errors="ignore"), "html.parser")
     best = ""
     for sel in HTML_SELECTORS:
         node = soup.select_one(sel)
         if node:
-            t = node.get_text("\n", strip=True)
+            t = html_text(node)
             if len(t) > len(best):
                 best = t
     if len(best) < MIN_DOC_CHARS:
-        best = max((d.get_text("\n", strip=True) for d in soup.find_all("div")), key=len, default="")
+        best = max((html_text(d) for d in soup.find_all("div")), key=len, default="")
     return [(best, None)]
 
 

@@ -111,7 +111,7 @@ Expand-Archive -Path $HOME\Downloads\p1-rag-corpus-v0.1.0-beta.2.zip -Destinatio
 待解析 263 条
 ...
 解析成功 261 条，失败 2 条（明细见 reports\parse_failures.csv）
-切出 4583 个 chunk，平均 275 字，最长 800 字
+切出 4190 个 chunk，平均 303 字，最长 800 字
 ```
 
 数字对不上就照下表排查：

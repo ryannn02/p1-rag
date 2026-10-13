@@ -5,6 +5,7 @@
 > 这两份结果不是在这台 Mac 上跑的：前 50 题跑于一台 Windows 机器（免安装 Python 3.12 + uv），语料同为 4583 chunk，`k=5`、`per_doc=2`，生成用 DeepSeek `deepseek-chat`。
 > 51–250 题的实测在本机，见 [`test_report_250.md`](test_report_250.md)；问题清单见 [`issues.md`](issues.md)。
 > **250 题的逐题结果汇总在 [`answers_250.md`](answers_250.md)。**
+> 前 50 题也跑在语料重建之前（4583 chunk），chunk 数对不上属正常，见问题 I-13。
 
 
 ## 一、总览

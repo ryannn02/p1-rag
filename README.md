@@ -77,7 +77,7 @@ python -m scripts.retrieval_smoke --per-doc 0       # 关掉「同文件限席�
 国内直连 huggingface.co 会被拒，`.env` 里设 `HF_ENDPOINT=https://hf-mirror.com`
 拉模型（必须在 `huggingface_hub` 导入前生效，`src/p1/retriever.py` 已在模块顶部 load）。
 
-召回口径见 `src/p1/retriever.py`：暴力余弦，4583 条语料单查询约 15 ms，
+召回口径见 `src/p1/retriever.py`：暴力余弦，4190 条语料单查询约 15 ms，
 语料上到十万级再换 FAISS。
 
 ## 生成与引用（阶段 4）

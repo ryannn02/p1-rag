@@ -92,7 +92,7 @@ HF_ENDPOINT=https://hf-mirror.com
 **在仓库根目录**解压（下一行的 `-DestinationPath .` 指的是当前目录，别省略）：
 
 ```powershell
-Expand-Archive -Path $HOME\Downloads\p1-rag-corpus-v0.1.0-beta.2.zip -DestinationPath . -Force
+Expand-Archive -Path $HOME\Downloads\p1-rag-corpus-v0.1.0-beta.3.zip -DestinationPath . -Force
 ```
 
 解压后应该出现 `data\raw\教务处\`、`data\raw\信息公开\` 这样的目录。

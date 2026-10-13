@@ -42,7 +42,7 @@ pytest -q                           # 29 项单元测试，不联网不烧 token
 的 `local_path` 一致），然后重建：
 
 ```bash
-unzip ~/Downloads/p1-rag-corpus-v0.1.0-beta.zip   # → data/raw/<部门>/<年份>/<文件名>
+unzip ~/Downloads/p1-rag-corpus-v0.1.0-beta.3.zip   # → data/raw/<部门>/<年份>/<文件名>
 python -m scripts.build_corpus    # 解析 + 切分
 python -m scripts.build_index     # 建向量索引
 ```

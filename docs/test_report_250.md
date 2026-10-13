@@ -8,6 +8,7 @@
 
 原始数据 `reports/batch_questions_250.csv`（200 行，逐题含答案、引用、拒答原因、时延）。
 **这轮跑出来的问题单独列在 [`issues.md`](issues.md)（11 条，带优先级）。**
+250 题的逐题结果汇总在 [`answers_250.md`](answers_250.md)。
 
 ```bash
 python -m scripts.eval_batch --from 51 --to 250   # 断点续跑，已完成题号自动跳过

@@ -94,7 +94,7 @@ def main():
             t0 = time.perf_counter()
             res, note = None, ""
             if blocked:
-                status = "接口拦截"
+                status, note = "接口拦截", blocked
             else:
                 try:
                     res = answer(q, k=args.k, retriever=r)

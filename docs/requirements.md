@@ -204,10 +204,14 @@
 }
 ```
 
-`refuse_reason` 分两类，**由谁给也是设计的一部分**：检索本身失败（`retrieval_empty` /
-`retrieval_low_score`）由**代码**直接给出，不过模型；只有「召回到了相关条款、但条款确实没规定」
-才由模型给（`no_evidence_in_corpus`）。实测发现两者混在一起会让模型把「我没找到」讲成
-「学校没规定」——见 `issues.md` I-2，这是必须避免的**假话式拒答**。
+`refuse_reason` 是**机读 code**，给用户看的那句话放 `answer`。全部取值见 `src/p1/contracts.py`：
+`retrieval_empty`、`retrieval_low_score`、`unsupported_language`、`invalid_model_output`、
+`no_valid_citation`、`no_evidence_in_corpus`。
+
+**由谁给也是设计的一部分**：检索本身失败（`retrieval_empty` / `retrieval_low_score`）和非中文提问
+（`unsupported_language`）由**代码**直接给出，不过模型；只有「召回到了相关条款、但条款确实撑不住
+这个问题」才由模型给（`no_evidence_in_corpus`）。实测发现两者混在一起会让模型把「我没找到」
+讲成「学校没规定」——见 `issues.md` I-2，这是必须避免的**假话式拒答**。
 
 ### 6.3 检索单元字段
 
@@ -269,7 +273,7 @@
 | FR-07 ~ FR-11 解析切分 | 阶段 2 | 已完成：261/263 解析成功，4190 块，3192 块带章节、2602 块带页码 |
 | FR-12 ~ FR-16 检索 | 阶段 3、7 | 已完成：bge-small-zh-v1.5 + 暴力余弦，Recall@5 = 19/20 = 95%，单查询 15 ms；同文件限席 2 |
 | FR-17 ~ FR-21 生成引用 | 阶段 4 | 已完成：提示词 `prompts/answer/v2.md`，引用元数据由代码回填、模型只挑编号，6/6 用例通过；FR-20 跳转原文待阶段 8 界面 |
-| FR-22 ~ FR-25 拒答 | 阶段 5 | 未开始 |
+| FR-22 ~ FR-25 拒答 | 阶段 5 | 准备已完成（理由 code 化 / 非中文拒答 / τ=0.45 前置过滤，2026-10-14）；判定闸门未做 |
 | FR-26 ~ FR-28 界面接口 | 阶段 8 | 提前做了最小演示版：`scripts/serve.py` 提供网页问答与 `/api/ask`（字段即 `AnswerResult`）。FR-26 的**展开引用**与 FR-28 的**流式输出**尚未做，留到阶段 8 |
 | FR-29 ~ FR-33 评测报告 | 阶段 6、9 | 评测集与评测脚本未开始；语料统计脚本已就绪 |
 | NFR-04 提示词版本化 | 阶段 0 | 已完成：目录约定、5 条结构校验测试 |

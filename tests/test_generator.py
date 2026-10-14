@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from p1.contracts import NO_VALID_CITATION, RETRIEVAL_LOW_SCORE, UNSUPPORTED_LANGUAGE
 from p1.generator import answer_from_hits, build_context, extract_json
 
 HITS = [
@@ -53,7 +54,8 @@ def test_model_cannot_cite_outside_given_clauses():
     res = answer_from_hits("随便问", HITS, llm=stub({"answer": "编的 [7]", "used": [7], "refused": False}))
     assert res.refused
     assert res.citations == []
-    assert "引用" in res.refuse_reason
+    assert res.refuse_reason == NO_VALID_CITATION
+    assert "引用" in res.answer  # 给用户看的话在 answer，refuse_reason 只放 code
 
 
 def test_empty_used_is_treated_as_refusal():
@@ -64,7 +66,8 @@ def test_empty_used_is_treated_as_refusal():
 def test_garbage_output_is_refused_not_crashed():
     res = answer_from_hits("随便问", HITS, llm=stub("对不起，我不能回答这个问题。"))
     assert res.refused
-    assert "JSON" in res.refuse_reason
+    assert res.refuse_reason == "invalid_model_output"
+    assert "无法核对" in res.answer
 
 
 def test_model_refusal_keeps_contact():
@@ -75,7 +78,38 @@ def test_model_refusal_keeps_contact():
                   "suggested_contact": "研究生院奖助办公室"}),
     )
     assert res.refused
+    assert res.refuse_reason == "no_evidence_in_corpus"
+    assert res.answer == "现有条款未涉及留学生"  # 话由模型说，code 由代码定
     assert res.suggested_contact == "研究生院奖助办公室"
+
+
+def test_top_retrieval_score_is_returned():
+    """分数随结果一起返回，调阈值和复盘拒答都要用。"""
+    res = answer_from_hits("图书馆一次能借几本", HITS,
+                           llm=stub({"answer": "30 册 [1]", "used": [1], "refused": False}))
+    assert res.top_retrieval_score == pytest.approx(0.6748)
+
+
+def test_non_chinese_question_is_refused_without_calling_model():
+    """英文提问不再靠中文向量硬检索——那会把「我没找到」讲成「学校没规定」（I-2）。"""
+    def boom(prompt):
+        raise AssertionError("非中文提问不该走到模型")
+
+    res = answer_from_hits("How many books can I borrow?", HITS, llm=boom)
+    assert res.refused
+    assert res.refuse_reason == UNSUPPORTED_LANGUAGE
+    assert "中文" in res.answer
+
+
+def test_low_score_is_cut_before_calling_the_model():
+    def boom(prompt):
+        raise AssertionError("分数低于前置阈值时不该调模型")
+
+    weak = [{"title": "无关制度", "page": "", "section": "", "text": "无关内容", "score": 0.31}]
+    res = answer_from_hits("食堂下周菜谱是什么", weak, llm=boom)
+    assert res.refused
+    assert res.refuse_reason == RETRIEVAL_LOW_SCORE
+    assert res.top_retrieval_score == pytest.approx(0.31)
 
 
 def test_no_hits_short_circuits_without_calling_model():
@@ -84,7 +118,7 @@ def test_no_hits_short_circuits_without_calling_model():
 
     res = answer_from_hits("随便问", [], llm=boom)
     assert res.refused
-    assert "没有召回" in res.refuse_reason
+    assert res.refuse_reason == "retrieval_empty"
 
 
 def test_same_clause_from_compilation_is_merged():

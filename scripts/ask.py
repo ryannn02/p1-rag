@@ -19,7 +19,7 @@ def main():
     res = answer(args.question, k=args.k)
     print(f"\n问题：{res.question}")
     if res.refused:
-        print(f"拒答：{res.refuse_reason}")
+        print(f"拒答（{res.refuse_reason}）：{res.answer}")
         if res.suggested_contact:
             print(f"建议咨询：{res.suggested_contact}")
     else:

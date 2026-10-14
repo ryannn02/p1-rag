@@ -5,20 +5,52 @@
 模型挑不出有效编号就不给答案——这是「强制引用」的落实方式，
 也是编造引用这种失败模式在结构上不可能发生的原因。
 
-没有依据就拒答属于阶段 5，这里只实现「引用不成立就不作答」这条底线。
+没有依据就拒答属于阶段 5，这里先落实三条底线（都不是「判定」，只是不该答的时候别答）：
+
+1. 引用不成立就不作答；
+2. 非中文提问直接拒答——bge 是中文模型，英文查询的向量落不到中文语义空间，
+   硬答会把「我没找到」讲成「学校没规定」（issues.md I-2）；
+3. top-1 低于前置阈值时干脆不调模型，省一次调用（阈值见下）。
+
+`refuse_reason` 一律是机读 code（见 contracts.py），给用户看的话放 `answer`。
 """
 
 import json
 import re
 from pathlib import Path
 
-from p1.contracts import AnswerResult, Citation
+from p1.contracts import (
+    BAD_MODEL_OUTPUT,
+    NO_EVIDENCE,
+    NO_VALID_CITATION,
+    RETRIEVAL_EMPTY,
+    RETRIEVAL_LOW_SCORE,
+    UNSUPPORTED_LANGUAGE,
+    AnswerResult,
+    Citation,
+)
 from p1.retriever import Retriever
 
 PROMPT_NAME = "answer"
 PROMPT_VERSION = "v2"
 SNIPPET_CHARS = 220
 MAX_CITED = 3
+# 前置过滤阈值：reports/threshold_sweep.png 上「误杀正常题为 0」的最大值（τ=0.45）。
+# 它只用来省掉明显无望的模型调用，不承担判定——分数区分不开「该答」与「该拒答」，
+# 依据见 issues.md I-3 与 reports/retrieval_scores_250.csv。
+LOW_SCORE_TAU = 0.45
+# 提问里一个汉字都没有就按「非中文」处理（阶段 5 决定暂时只支持中文提问）
+CJK = re.compile(r"[\u4e00-\u9fff]")
+
+# code → 给用户看的一句话；模型判的拒答（NO_EVIDENCE）用模型自己那句话
+MESSAGES = {
+    RETRIEVAL_EMPTY: "在已收录的现行制度中没有检索到相关条款，无法给出可靠答复。",
+    RETRIEVAL_LOW_SCORE: "检索到的条款与这个问题相关性过低，不足以作为依据。",
+    UNSUPPORTED_LANGUAGE: "目前只支持用中文提问，无法可靠检索和回答其他语言的提问。",
+    BAD_MODEL_OUTPUT: "模型输出无法解析，无法核对条款引用。",
+    NO_VALID_CITATION: "没有可核对的条款引用，无法给出可信答复。",
+    NO_EVIDENCE: "在已收录的现行制度中未找到能支撑该问题的条款。",
+}
 
 
 def load_prompt(version=PROMPT_VERSION):
@@ -116,24 +148,37 @@ def renumber(answer, picked, alias):
     return answer.strip()
 
 
-def refusal(question, reason, contact=None):
+def refusal(question, code, contact=None, text=None, top_score=None):
+    """拒答：`answer` 给用户看，`refuse_reason` 是机读 code。"""
     return AnswerResult(
-        question=question, answer="", refused=True, refuse_reason=reason, suggested_contact=contact
+        question=question,
+        answer=text or MESSAGES.get(code, ""),
+        refused=True,
+        refuse_reason=code,
+        suggested_contact=contact,
+        top_retrieval_score=top_score,
     )
 
 
 def answer_from_hits(question, hits, llm=None):
+    if not CJK.search(question or ""):
+        return refusal(question, UNSUPPORTED_LANGUAGE)
     if not hits:
-        return refusal(question, "检索没有召回任何条款")
+        return refusal(question, RETRIEVAL_EMPTY)
+    top = float(hits[0]["score"])
+    if top < LOW_SCORE_TAU:
+        return refusal(question, RETRIEVAL_LOW_SCORE, top_score=top)
     llm = llm or _default_llm
     prompt = load_prompt().replace("{{question}}", question).replace("{{context}}", build_context(hits))
     raw = llm(prompt)
     data = extract_json(raw)
     if not isinstance(data, dict):
-        return refusal(question, "模型输出不是合法 JSON，无法核对引用")
+        return refusal(question, BAD_MODEL_OUTPUT, top_score=top)
 
     if data.get("refused"):
-        return refusal(question, data.get("refuse_reason") or "依据不足", data.get("suggested_contact"))
+        # 模型判的「条款支撑不住」：话由模型说，code 由我们定
+        return refusal(question, NO_EVIDENCE, data.get("suggested_contact"),
+                       text=str(data.get("refuse_reason") or "") or None, top_score=top)
 
     picked, seen = [], set()
     for idx in data.get("used") or []:
@@ -143,7 +188,7 @@ def answer_from_hits(question, hits, llm=None):
         if len(picked) == MAX_CITED:
             break
     if not picked:
-        return refusal(question, "模型没有给出可核对的条款引用", data.get("suggested_contact"))
+        return refusal(question, NO_VALID_CITATION, data.get("suggested_contact"), top_score=top)
     picked, alias = dedupe_citations(picked)
 
     try:
@@ -156,6 +201,7 @@ def answer_from_hits(question, hits, llm=None):
         citations=[to_citation(h) for _, h in picked],
         confidence=conf,
         suggested_contact=data.get("suggested_contact"),
+        top_retrieval_score=top,
     )
 
 

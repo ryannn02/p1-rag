@@ -124,21 +124,34 @@
 > **2026-10-14 按实测改写了本节。** 原设计的第一道闸门「top-k 检索分数过阈值」已被 250 题实测推翻，
 > 证据与数据见 [`issues.md`](issues.md) I-3。改后的设计如下。
 
+**已定的两个口径（2026-10-14）**
+
+- **非中文提问：暂时直接拒答**，`refuse_reason = unsupported_language`，并明确告知只支持中文。
+  依据是 I-2：bge 是中文模型，英文查询落不到中文语义空间，硬答只能把「我没找到」说成「学校没规定」。
+  已实现（`generator.py` 的汉字检测）。换多语言 embedding 是以后的事。
+- **整体取向保守：宁可拒答，不给错答案。** 判定拿不准就当「支撑不住」拒掉，验收时**误答率优先于误拒率**。
+
 **关键动作**
 
 - **第一道：只做极低阈值的前置过滤，不承担判定职责。** 分数分不开「该答」和「该拒答」——
   作答题 top-1 中位 0.691、最低 0.480，拒答题中位 0.600、最低 0.377，两堆几乎完全重叠；
   扫阈值的结果是「想全抓到该拒的 10 道，得拒掉 92% 的正常题」。
-  所以 τ≈0.45 只用来省掉明显无望的模型调用（此点误杀 0%），判断权不下放给它。
+  **τ=0.45 已按新语料重扫确认**（`python -m scripts.retrieval_scores`，曲线见
+  `reports/threshold_sweep.png`、明细 `reports/retrieval_scores_250.csv`）：这是「误杀正常题为 0」
+  的最大值，再往上调就开始误杀。它就用来省掉明显无望的模型调用，判断权不下放给它。
 - **第二道：模型判「这些片段能不能支撑这个问题」。** 新建 `prompts/answer/v3.md`（`v2.md` 保留不删），
   **在同一次调用里**先出支撑性判定（supported / partial / unsupported）再给答案，不为此多调一次模型。
-- **让召回质量可观测（治 I-2 的假话）。** 拒答理由分两类：检索本身失败由**代码**给出
-  （`retrieval_empty` / `no_evidence_above_threshold`），条款确实没规定才轮到模型说。
-  现在模型看不到「召回是空的还是没用的」，才会把「我没找到」讲成「学校没规定」。
-- **归口部门映射表（治 I-6）。** `suggested_contact` 改为从 `meta/documents.csv` 的 `dept` 列反查、
-  **代码回填**，不让模型自由生成（现在 25 条拒答里 3 条为空）。没有电话数据源，只给部门名 + 官网 URL。
-- **阈值不拍脑袋。** 先用 `reports/batch_questions_250.csv` 里现成的 score 列**离线**扫一遍
-  （不重跑模型、不烧 token），再用 `matplotlib` 画「拒答率 vs 误拒率」曲线，把选点理由留在报告里。
+- **让召回质量可观测（治 I-2 的假话）。** ✅ 已完成：`refuse_reason` 改成机读 code
+  （`retrieval_empty` / `retrieval_low_score` / `unsupported_language` / `invalid_model_output` /
+  `no_valid_citation` / `no_evidence_in_corpus`，见 `src/p1/contracts.py`），给用户看的那句话放
+  `answer`；检索类理由一律由代码给，只有「条款在但支撑不住」才轮到模型判。
+- **归口部门映射表（治 I-6）。** ✅ 数据层已就绪：`src/p1/contacts.py` 从 `meta/documents.csv` 的
+  `dept` / `source_url` 推出「部门 → 官网」，`contact_for()` 返回「学生处（https://xsc.sspu.edu.cn）」。
+  剩下的是阶段 5 本体：拒答时怎么把问题归到哪个部门（关键词表或让模型给部门名，再由代码转 URL）。
+  没有电话数据源，不编。
+- **阈值不拍脑袋。** ✅ 已做：`scripts/retrieval_scores.py` 只跑检索、把 250 题的 top-5 分数落盘
+  （`reports/retrieval_scores_250.csv`），并扫出曲线（`--plot` → `reports/threshold_sweep.png`）。
+  注意原先写的「用 batch CSV 现成的 score 列」是错的——那份 CSV 只存引用文件名，没有分数。
 - **固定验收靶子**：#234（主体不符仍照搬条款作答）写进 `prompts/answer/cases.jsonl` 当回归用例；
   #249（英文提问 + 假拒答理由）重跑后不许再出现假话。
 
@@ -147,8 +160,9 @@
 
 **工具**
 - 纯代码实现 + 判定提示词（`prompts/answer/v3.md`）
-- `matplotlib` 画阈值曲线
-- `scripts/eval_batch.py` 断点续跑；新增一个读 `reports/batch_questions_250.csv` 的阈值扫描脚本
+- `scripts/retrieval_scores.py`（检索分数落盘 + 阈值扫描）、`matplotlib` 画曲线（可选依赖：
+  `pip install -e ".[viz]"`）
+- `scripts/eval_batch.py` 断点续跑（已加 `top1_score` 列，续跑时会自动给老 CSV 补表头）
 
 **阶段出口**
 - 「该拒的题拒答率」与「正常题误拒率」**两个数字都有**，附曲线与选点理由

@@ -38,7 +38,7 @@ OVERRIDE = {
 }
 FIELDS = ["id", "group", "question", "status", "refused", "refuse_reason",
           "suggested_contact", "n_cites", "citations", "latency_s", "answer",
-          "expect", "note"]
+          "expect", "note", "top1_score"]
 
 
 def parse_set(path):
@@ -58,6 +58,22 @@ def parse_set(path):
     return rows
 
 
+def migrate_header(out):
+    """老 CSV 没有 top1_score 列时补上，否则续跑会写串列。"""
+    if not out.exists():
+        return
+    with out.open(encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+        if not rows or list(rows[0].keys()) == FIELDS:
+            return
+    with out.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=FIELDS, lineterminator="\n")
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: r.get(k, "") for k in FIELDS})
+    print(f"{out} 表头补上 top1_score，{len(rows)} 条旧结果原样保留\n")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--set", type=Path, default=DEFAULT_SET)
@@ -69,6 +85,7 @@ def main():
 
     # 文件名只跟问题集走，不跟区间走：换个区间重跑才能续上同一份 CSV
     out = args.out or Path(f"reports/batch_{args.set.stem}.csv")
+    migrate_header(out)
     done = set()
     if out.exists():
         with out.open(encoding="utf-8") as f:
@@ -115,6 +132,8 @@ def main():
                 "latency_s": f"{dt:.2f}",
                 "answer": (res.answer if res else "") or "",
                 "expect": row["expect"], "note": note,
+                "top1_score": ("" if res is None or res.top_retrieval_score is None
+                               else f"{res.top_retrieval_score:.4f}"),
             })
             f.flush()
             print(f"[{i}/{len(todo)}] #{row['id']} {status} {dt:5.1f}s "

@@ -102,8 +102,9 @@ const esc = s => String(s).replace(/[&<>"]/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function render(d) {
   if (d.refused) {
-    return '<div class="answer refused"><b>拒绝回答</b><br>' + esc(d.refuse_reason || '')
+    return '<div class="answer refused"><b>拒绝回答</b><br>' + esc(d.answer || d.refuse_reason || '')
       + (d.suggested_contact ? '<br><span class="meta">建议咨询：' + esc(d.suggested_contact) + '</span>' : '')
+      + '<br><span class="meta">原因代码：' + esc(d.refuse_reason || '') + '</span>'
       + '</div>';
   }
   const cites = d.citations.map((c, i) =>

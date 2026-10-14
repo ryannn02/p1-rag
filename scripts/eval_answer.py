@@ -54,7 +54,8 @@ def main():
         head = "OK  " if not fails else "FAIL"
         print(f"[{head}] {i}. {case['input']}")
         if res.refused:
-            print(f"        拒答：{res.refuse_reason}｜咨询：{res.suggested_contact or '（缺）'}")
+            print(f"        拒答（{res.refuse_reason}）：{res.answer}"
+                  f"｜咨询：{res.suggested_contact or '（缺）'}")
         else:
             print(f"        {res.answer}")
             for c in res.citations:

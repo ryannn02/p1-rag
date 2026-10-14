@@ -1,16 +1,8 @@
-# P1 校园制度问答助手 · 技术实现报告
+# 校园制度问答助手
 
-截至 2026-10-13。团队 5 人，16 周课程周期，已完成阶段 0–4（规格冻结 → 采集 → 解析切分 → 检索基线 → 生成与引用）。
+已完成阶段 0–4：规格冻结 → 采集 → 解析切分 → 检索基线 → 生成与引用。
 
-**一句话**：用规则化的爬虫把学校 25 个站点的现行制度收下来，解析切分成 4190 个 chunk，
-用本地 `bge-small-zh-v1.5` 做向量召回，DeepSeek 生成答案，**引用元数据全部由代码回填**，
-最后用一个标准库写的最小网页把整条链路演示出来。
-
----
-
-## 一、用了哪些工具
-
-### 语言与运行时
+## 一、工具
 
 | 项 | 选择 | 说明 |
 | --- | --- | --- |
@@ -19,7 +11,7 @@
 | 虚拟环境 | `.venv` | 系统 Python 不装任何东西 |
 | 测试 | `pytest` 9.1 | 29 项，**全部离线**（stub 模型），不联网不烧 token |
 
-### Python 依赖（`pyproject.toml` 里锁定的全部）
+### Python 依赖
 
 | 包 | 版本 | 干什么 |
 | --- | --- | --- |
@@ -28,32 +20,22 @@
 | `python-docx` | 1.2 | DOCX 段落与表格；读不到时回退扫 `word/*.xml`（制度常整篇塞在文本框里） |
 | `numpy` | 2.5 | 向量矩阵与余弦相似度 |
 | `sentence-transformers` + `torch` | 6.1 / 2.14 | 跑 bge 向量模型，Apple Silicon 走 MPS |
-| `requests` | 2.34 | 采集，以及调模型（HTTP 就够，不装各家 SDK） |
-| `pydantic` | 2.13 | 接口契约即代码 |
+| `requests` | 2.34 | 采集，以及调模型（HTTP 就够） |
+| `pydantic` | 2.13 | 接口契约 |
 | `python-dotenv` | 1.2 | 读 `.env` |
 
 ### 外部服务
 
-- **生成**：DeepSeek `deepseek-chat`。走 OpenAI 兼容的 `/chat/completions`，所以通义/智谱/Moonshot 换个 `LLM_BASE_URL` 就能用
-- **向量模型**：`BAAI/bge-small-zh-v1.5`，**本地跑**，不花钱、不联网推理。首次下载走 `HF_ENDPOINT=https://hf-mirror.com`（直连 huggingface.co 会被拒）
+- **生成**：DeepSeek `deepseek-chat`
+- **向量模型**：`BAAI/bge-small-zh-v1.5`
 
-### 系统工具（不是 Python 包）
+### 系统工具
 
-- `textutil`（macOS 自带）/ `soffice`（LibreOffice）—— `.doc` 是二进制格式，没有纯 Python 解析库，只能借这两个转文本
-- `git` + GitHub —— 代码托管 + 用 release 附件分发 53 MB 原始语料（不进 Git）
+- `textutil`（macOS 自带）/ `soffice`（LibreOffice）—— `.doc` 是二进制格式，没有纯 Python 解析库，用来转文本
+- `git` + GitHub —— 代码托管 + release 附件分发 53 MB 原始语料（不进 Git）
 - Python `zipfile` —— 打语料包。macOS 自带的 `zip` 不写 UTF-8 文件名标志，中文名会乱码，重建时全线报 `file_missing`
 
-### 明确没用，以及为什么
-
-| 没用 | 原因 |
-| --- | --- |
-| FAISS / Chroma / Milvus | 4190 个 chunk 的暴力余弦一次查询是毫秒级，多引一个索引库只是多一份要同步的状态 |
-| LangChain / LlamaIndex | 流程只有「检索 → 拼提示词 → 调模型 → 校验引用」四步，自己写 170 行更可控，也更好讲 |
-| FastAPI / Flask | demo 只要一个页面 + 一个接口，标准库 `http.server` 够用 |
-| MySQL / Navicat | 语料是「原始文件 + `chunks.jsonl`」的一次性构建产物，没有并发写和事务需求；元数据用 CSV，能 diff、能进 Git |
-| OCR | 2 份整页扫描 PDF 暂时没入库，属已知缺口 |
-
-### 代码地图
+### 代码
 
 | 脚本 | 职责 |
 | --- | --- |
@@ -72,7 +54,7 @@
 
 ---
 
-## 二、知识库怎么搭建的
+## 二、知识库搭建
 
 四步：**圈定来源 → 批量采集 → 分诊与版本校对 → 人工交叉校验**。
 
@@ -125,7 +107,7 @@ data/chunks.jsonl            检索用的 chunk（进 Git）
 
 ---
 
-## 三、文档怎么切分的
+## 三、文档切分
 
 流水线全在 `scripts/build_corpus.py`：**解析 → 清洗 → 切分 → 合并碎片 → 落盘**。
 
@@ -211,7 +193,7 @@ Citation:     file, page, section, snippet, score
 
 ---
 
-## 五、网站 demo 怎么做
+## 五、网站 demo
 
 一个文件 `scripts/serve.py`，**只用标准库** `http.server`（`ThreadingHTTPServer`），不引 Web 框架。
 
@@ -220,20 +202,14 @@ Citation:     file, page, section, snippet, score
 - **界面**：一个输入框 + 4 个示例问题按钮（图书馆借书 / 转专业 / 宿舍违规电器 / 一个库里没有的问题）。
   答案块显示正文 + 置信度，下面逐条列引用：`[1] 《文件名》 章节 第X页 · 匹配度 0.782` + 片段；
   拒答时换一套配色，显示拒答原因和建议咨询部门。前端就是一段原生 JS，没有构建步骤
-- **输入校验放在服务端**：空问题、超 200 字、非法 JSON 一律 400，**不打模型**（调模型要花钱）
+- **输入校验放在服务端**：空问题、超 200 字、非法 JSON 一律 400
 - **模型超时/网络错返回 502**，不把服务打挂
-- **只监听 `127.0.0.1`**，不暴露到局域网。要产品化（多用户、流式输出、鉴权）再换 FastAPI 也不亏
-
-启动（仓库根目录）：
 
 ```bash
-cd ~/proj/p1-rag && source .venv/bin/activate
-python -m scripts.serve          # → http://127.0.0.1:8000
-python -m scripts.serve 9000     # 换端口
+cd ~/proj/p1-rag
+source .venv/bin/activate
+python scripts/serve.py
 ```
-
-首次提问约 15 秒（加载本地向量模型），之后每问不到 1 秒；服务占住终端，`Ctrl+C` 停。
-命令行等价入口：`python -m scripts.ask "图书馆一次能借几本书"`。
 
 ---
 
@@ -253,12 +229,3 @@ python -m scripts.serve 9000     # 换端口
 | 端到端 | 6/6 通过（打真模型），含 2 条拒答 |
 | 250 题实测 | 逐题判定 ✓ 210 / △ 36 / ✗ 4 |
 
----
-
-## 七、还没做的
-
-- **阶段 5：无依据拒答 + 一致性校验**（下一阶段）。I-1 主体不符仍作答、I-2 拒答理由是假话、I-3 检索分数分不开「该答/该拒答」都压在它身上
-- **阶段 6**：≥150 条评测集；**阶段 7**：索引层折叠近似重复条款（解「38% 的引用落在汇编/手册上」）
-- **界面**：引用不能点开原文、没有流式输出（阶段 8）
-- **语料**：2 份整页扫描 PDF 未入库（需 OCR）；26 份文档标题粘了日期前缀（I-12）
-- **成本口径没做**：现在只记了时延和调用次数，没有 token 记账，报不出「一次问答大概多少钱」——课程要求里如果有成本表，阶段 9 得补

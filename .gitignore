@@ -4,6 +4,7 @@ __pycache__/
 .env
 .pytest_cache/
 .DS_Store
+.idea/
 
 # 语料不进 Git（体积大且可再生成）
 data/raw/*

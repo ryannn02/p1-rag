@@ -80,7 +80,7 @@
 
 **工具**
 - `PyMuPDF`、`MinerU` / `PaddleOCR`、`python-docx`
-- `LangChain TextSplitter`（只用切分器，不引入整套框架）
+- 自写章节感知切分：`scripts/build_corpus.py`（保正文 / 页码 / 章节路径，不用框架切分器）
 
 **阶段出口**：`chunks.jsonl` 字段稳定，抽查 20 块内容与原文件页码一致。
 
@@ -285,7 +285,7 @@
 | --- | --- |
 | 采集 | `requests` + `BeautifulSoup`、`playwright`、`trafilatura` |
 | 解析 | `PyMuPDF`、`MinerU` / `PaddleOCR`、`python-docx` |
-| 切分 | `LangChain TextSplitter`（仅切分器） |
+| 切分 | 自写章节感知切分（`scripts/build_corpus.py`） |
 | 嵌入与向量库 | `sentence-transformers`（bge-m3 / bge-large-zh-v1.5）、`FAISS` / `Chroma` |
 | 检索与重排 | `rank_bm25` 或 Elasticsearch、RRF 融合、`bge-reranker-v2-m3` |
 | 生成 | LLM API（DeepSeek / Qwen / 通义）、JSON Schema 或 Function Calling |

@@ -15,8 +15,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 只为画的阈值曲线用；装：pip install -e ".[viz]"
+# 只为画的阈值曲线用；装：uv sync --extra viz
 viz = ["matplotlib>=3.8"]
+# 跑测试用；装：uv sync --extra dev
+dev = ["pytest>=8"]
 
 [build-system]
 requires = ["hatchling"]
